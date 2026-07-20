@@ -86,14 +86,14 @@
 
   <script>
     // ── MULTI-BUSINESS CONFIG & SLUG DETECTION ─────────────────────────────────
-    const urlParams    = new URLSearchParams(window.location.search);
+    const urlParams     = new URLSearchParams(window.location.search);
     const BUSINESS_SLUG = urlParams.get('biz') || urlParams.get('slug') || urlParams.get('business') || 'saloon';
-    const BACKEND_URL   = 'https://scan-qr-backend.onrender.com';
+    const BACKEND_URL    = 'https://scan-qr-backend.onrender.com';
     
-    // DEFAULT PLACEHOLDER GOOGLE REVIEW LINK (update or set in Admin Panel)
+    // DEFAULT PLACEHOLDER GOOGLE REVIEW LINK (overridden dynamically by business config)
     let googleReviewLink = 'https://search.google.com/local/writereview?placeid=YOUR_SALOON_PLACE_ID';
 
-    // ── COMBINATORIAL DYNAMIC REVIEW GENERATOR (175+ Unique Permutations Instantly) ──
+    // ── COMBINATORIAL HUMAN REVIEW FALLBACK ────────────────────────────────────
     const OPENINGS = [
       'honestly so happy with my saloon visit!',
       'Great experience at this saloon.',
@@ -125,8 +125,8 @@
       return `${o} ${m} ${c}`;
     }
 
-    let redirected = false;
-    const selectedReview = generateUniqueReview();
+    let activeReview = generateUniqueReview();
+    let redirected   = false;
 
     // ── COPY CLIPBOARD (Instant) ────────────────────────────────────────────────
     function copyInstantly(text) {
@@ -142,17 +142,12 @@
       }
     }
 
-    // ── INSTANT REDIRECT FUNCTION (0ms wait) ──────────────────────────────────
+    // ── INSTANT REDIRECT ENGINE ────────────────────────────────────────────────
     function doRedirect() {
       if (redirected) return;
       redirected = true;
 
-      copyInstantly(selectedReview);
-
-      // Non-blocking background telemetry send with specific business slug
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}?service=scan`);
-      }
+      copyInstantly(activeReview);
 
       // Instant redirect
       window.location.href = googleReviewLink;
@@ -162,27 +157,30 @@
       doRedirect();
     }
 
-    // ── BACKGROUND FETCH: Load custom business config (name & Google Link) ──────
-    function loadBusinessConfig() {
-      fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(cfg => {
-          if (cfg && cfg.googleReviewLink) {
-            googleReviewLink = cfg.googleReviewLink;
-          }
-          if (cfg && cfg.name) {
-            document.getElementById('heading').textContent = `Opening ${cfg.name} Reviews…`;
-          }
-        })
-        .catch(() => {});
-    }
+    // ── PRE-LOAD BUSINESS CONFIG (Name & Google Review Link) ────────────────────
+    fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(cfg => {
+        if (cfg && cfg.googleReviewLink) googleReviewLink = cfg.googleReviewLink;
+        if (cfg && cfg.name) document.getElementById('heading').textContent = `Opening ${cfg.name} Reviews…`;
+      })
+      .catch(() => {});
 
-    // ── EXECUTE IMMEDIATELY ON SCRIPT LOAD (0.01 SECONDS SPEED!) ────────────────
-    copyInstantly(selectedReview);
-    loadBusinessConfig();
-    
-    // Fire redirect instantly
-    setTimeout(doRedirect, 50);
+    // ── FETCH FIFO QUEUE REVIEW FROM BACKEND (Pops Gemini AI review from buffer) ─
+    fetch(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data && data.review) {
+          activeReview = data.review;
+        }
+        doRedirect();
+      })
+      .catch(() => {
+        doRedirect();
+      });
+
+    // ── MAXIMUM SAFETY TIMER (150ms timeout to guarantee sub-150ms speed!) ────
+    setTimeout(doRedirect, 150);
   </script>
 </body>
 </html>
