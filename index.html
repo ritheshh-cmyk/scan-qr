@@ -3,18 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Restaurant Feedback</title>
+  <title>Salon Feedback</title>
   <style>
     :root {
-      --tomato: #c7432d;
-      --tomato-dark: #9f2f20;
-      --leaf: #446b3c;
-      --cream: #fff8ee;
-      --paper: #fffdf8;
-      --ink: #2d241d;
-      --muted: #6d5c4e;
-      --ring: rgba(199, 67, 45, 0.22);
-      --shadow: 0 18px 45px rgba(89, 49, 25, 0.14);
+      --rose:       #c0395c;
+      --rose-dark:  #9b2847;
+      --rose-light: rgba(192,57,92,0.12);
+      --gold:       #8a6c3e;
+      --cream:      #fff8f0;
+      --paper:      #fffcf9;
+      --ink:        #2d1f2b;
+      --muted:      #7a5f70;
+      --ring:       rgba(192,57,92,0.22);
+      --shadow:     0 18px 48px rgba(100,40,60,0.13);
     }
 
     * { box-sizing: border-box; }
@@ -22,45 +23,49 @@
     body {
       min-height: 100vh;
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at top left, rgba(255, 188, 122, 0.32), transparent 32rem),
-        linear-gradient(145deg, #fff3df 0%, #fff8ee 48%, #f3ead7 100%);
+        radial-gradient(ellipse at top left, rgba(255,200,210,0.35), transparent 40%),
+        radial-gradient(ellipse at bottom right, rgba(255,230,190,0.3), transparent 40%),
+        linear-gradient(150deg, #fff0f3 0%, #fff8f0 55%, #faf3e8 100%);
       display: grid;
       place-items: center;
       padding: 22px;
     }
 
     main {
-      width: min(100%, 440px);
+      width: min(100%, 450px);
       background: var(--paper);
-      border: 1px solid rgba(141, 92, 52, 0.16);
-      border-radius: 8px;
+      border: 1px solid rgba(160,100,120,0.14);
+      border-radius: 10px;
       box-shadow: var(--shadow);
-      padding: 28px 22px;
+      padding: 30px 24px;
     }
 
     .kicker {
-      margin: 0 0 12px;
-      color: var(--leaf);
-      font-size: 0.78rem;
+      margin: 0 0 10px;
+      color: var(--rose);
+      font-size: 0.74rem;
       font-weight: 700;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     h1 {
       margin: 0;
-      font-size: clamp(1.75rem, 8vw, 2.35rem);
-      line-height: 1.08;
-      letter-spacing: 0;
+      font-size: clamp(1.6rem, 7vw, 2.2rem);
+      line-height: 1.1;
+      font-weight: 800;
     }
 
     .subtext {
-      margin: 14px 0 24px;
+      margin: 12px 0 24px;
       color: var(--muted);
-      font-size: 1rem;
+      font-size: 0.96rem;
       line-height: 1.55;
     }
 
@@ -68,12 +73,12 @@
       width: 100%;
       min-height: 54px;
       border: 0;
-      border-radius: 8px;
+      border-radius: 10px;
       font: inherit;
-      font-size: 1.05rem;
+      font-size: 1rem;
       font-weight: 700;
       cursor: pointer;
-      transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+      transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, opacity 150ms;
       touch-action: manipulation;
     }
 
@@ -84,148 +89,236 @@
     }
 
     button:active { transform: translateY(1px); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
 
-    .primary {
+    .btn-primary {
       color: #fff;
-      background: var(--tomato);
-      box-shadow: 0 10px 22px rgba(199, 67, 45, 0.25);
+      background: linear-gradient(135deg, var(--rose) 0%, #a82d4e 100%);
+      box-shadow: 0 8px 24px rgba(192,57,92,0.28);
+      position: relative;
+      overflow: hidden;
     }
 
-    .primary:hover { background: var(--tomato-dark); }
-    .primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
-
-    .secondary {
-      margin-top: 14px;
-      color: #fff;
-      background: var(--leaf);
-      box-shadow: 0 10px 22px rgba(68, 107, 60, 0.22);
+    .btn-primary::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0);
+      transition: background 150ms;
     }
 
-    .secondary:hover { background: #365830; }
+    .btn-primary:hover:not(:disabled)::after { background: rgba(255,255,255,0.07); }
+
+    .btn-secondary {
+      margin-top: 12px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--gold) 0%, #6e5230 100%);
+      box-shadow: 0 8px 24px rgba(138,108,62,0.22);
+    }
+
+    .btn-secondary:hover:not(:disabled) { background: linear-gradient(135deg, #7a5e33 0%, #5c4327 100%); }
 
     .review-area {
       display: none;
       margin-top: 20px;
     }
 
-    .review-area.is-visible { display: block; }
+    .review-area.visible { display: block; }
 
     label {
       display: block;
       margin-bottom: 8px;
       color: var(--muted);
-      font-size: 0.95rem;
-      font-weight: 700;
+      font-size: 0.9rem;
+      font-weight: 600;
     }
 
     textarea {
       width: 100%;
-      min-height: 132px;
+      min-height: 130px;
       resize: vertical;
-      border: 1px solid rgba(109, 92, 78, 0.28);
-      border-radius: 8px;
-      background: #fffaf1;
+      border: 1px solid rgba(120,70,90,0.2);
+      border-radius: 10px;
+      background: var(--cream);
       color: var(--ink);
       padding: 14px;
       font: inherit;
-      font-size: 1rem;
-      line-height: 1.45;
+      font-size: 0.96rem;
+      line-height: 1.5;
     }
 
     .status {
-      min-height: 22px;
+      min-height: 20px;
       margin: 10px 0 0;
-      color: var(--leaf);
-      font-size: 0.92rem;
-      font-weight: 700;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--rose);
     }
 
-    .loading-dot {
-      display: inline-block;
-      animation: blink 1.2s infinite;
+    /* Loading state */
+    .loading-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.88rem;
     }
 
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.2; }
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(192,57,92,0.2);
+      border-top-color: var(--rose);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
     }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* AI badge */
+    .ai-badge {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--rose);
+      background: var(--rose-light);
+      border: 1px solid rgba(192,57,92,0.2);
+      border-radius: 20px;
+      padding: 2px 10px;
+      margin-bottom: 8px;
+      width: fit-content;
+    }
+
+    .ai-badge.visible { display: inline-flex; }
 
     @media (min-width: 560px) {
-      main { padding: 34px 32px; }
+      main { padding: 36px 32px; }
     }
   </style>
 </head>
 <body>
   <main>
-    <p class="kicker">Quick feedback</p>
-    <h1 id="heading">Loading<span class="loading-dot">…</span></h1>
-    <p class="subtext">Tap once, copy your review, and share it on Google.</p>
+    <p class="kicker">✨ Quick Feedback</p>
+    <h1 id="heading">Loading…</h1>
+    <p class="subtext">One tap — we'll generate your review. Copy and share it on Google.</p>
 
-    <button class="primary" id="rateButton" type="button" disabled>Rate Us</button>
+    <button class="btn-primary" id="rateBtn" type="button" disabled>
+      <span id="btnText">✨ Generate My Review</span>
+      <span id="btnSpinner" style="display:none" class="loading-wrap"><span class="spinner"></span> Generating…</span>
+    </button>
 
     <section class="review-area" id="reviewArea" aria-live="polite">
-      <label for="reviewText">Your review</label>
+      <div class="ai-badge" id="aiBadge">⚡ AI Generated</div>
+      <label for="reviewText">Your review — feel free to edit</label>
       <textarea id="reviewText"></textarea>
-      <button class="secondary" id="copyButton" type="button">Copy Review &amp; Open Google</button>
-      <p class="status" id="statusMessage" role="status"></p>
+      <button class="btn-secondary" id="copyBtn" type="button">📋 Copy & Open Google</button>
+      <p class="status" id="statusMsg" role="status"></p>
     </section>
   </main>
 
   <script>
-    // ── CONFIG ── change these two lines per business deployment ─────────────────
+    // ── CONFIG — only these 2 lines change per business deployment ──────────────
     const BUSINESS_SLUG = 'demo';
     const BACKEND_URL   = 'https://scan-qr-backend.onrender.com';
 
-    // ── FALLBACK (used if backend is unreachable) ─────────────────────────────────
+    // ── FALLBACK SALON REVIEWS (used when backend/AI unavailable) ───────────────
     const FALLBACK = {
-      name: 'Our Restaurant',
-      googleReviewLink: 'https://search.google.com/local/writereview',
+      name:            'Our Salon',
+      googleReviewLink:'https://search.google.com/local/writereview',
+      type:            'salon',
       reviews: [
-        'Amazing taste, friendly service, and a cozy ambience. Everything felt fresh and worth the price.',
-        'Delicious food, quick service, and lovely ambience. Fresh ingredients made the meal excellent value.',
-        'Great flavours, warm staff, and relaxing ambience. The food tasted fresh and prices felt fair.',
-        'Loved the fresh food, attentive service, and welcoming ambience. A tasty meal with great value.',
-        'Excellent taste, clean presentation, and kind service. Fresh dishes made the visit memorable.'
+        'Absolutely loved my experience here! The staff were warm, professional, and knew exactly what I wanted. The salon was spotless and the atmosphere was so relaxing. Great value for the quality of service — will definitely come back!',
+        'The team here is incredible. My hair has never looked better, and everyone made me feel so welcome. Clean, cozy, and very skilled stylists. 100% recommend to anyone looking for a reliable and talented salon.',
+        'Such a lovely salon! The service was top-notch from start to finish. My stylist listened carefully and delivered exactly what I asked for. Very reasonable pricing for the outstanding work they do. Highly recommended!',
+        'I had a fantastic experience — the salon is beautifully maintained, the staff are friendly and talented, and the result exceeded my expectations. A hidden gem that I'll keep coming back to for sure!',
+        'One of the best salon visits I've had. The attention to detail was remarkable, the products used were high quality, and I left feeling completely transformed. The team is genuinely passionate about their craft.'
       ]
     };
 
-    // ── STATE ────────────────────────────────────────────────────────────────────
-    let config = null;
-    let lastReviewIndex = -1;
+    // ── STATE ───────────────────────────────────────────────────────────────────
+    let config         = null;
+    let lastReviewIdx  = -1;
+    let backendOnline  = false;
 
-    const heading       = document.getElementById('heading');
-    const rateButton    = document.getElementById('rateButton');
-    const reviewArea    = document.getElementById('reviewArea');
-    const reviewText    = document.getElementById('reviewText');
-    const copyButton    = document.getElementById('copyButton');
-    const statusMessage = document.getElementById('statusMessage');
+    const heading    = document.getElementById('heading');
+    const rateBtn    = document.getElementById('rateBtn');
+    const btnText    = document.getElementById('btnText');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const reviewArea = document.getElementById('reviewArea');
+    const reviewText = document.getElementById('reviewText');
+    const copyBtn    = document.getElementById('copyBtn');
+    const statusMsg  = document.getElementById('statusMsg');
+    const aiBadge    = document.getElementById('aiBadge');
 
-    // ── LOAD CONFIG FROM BACKEND ──────────────────────────────────────────────────
-    async function loadConfig() {
+    // ── BOOT: load config from backend ──────────────────────────────────────────
+    async function init() {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        config = await res.json();
-      } catch (err) {
-        console.warn('Backend unreachable, using fallback config.', err.message);
-        config = FALLBACK;
+        const r = await fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`, { signal: AbortSignal.timeout(8000) });
+        if (r.ok) {
+          config        = await r.json();
+          backendOnline = true;
+        } else {
+          config = FALLBACK;
+        }
+      } catch {
+        config        = FALLBACK;
+        backendOnline = false;
       }
-      heading.textContent = `How was your experience at ${config.name}?`;
-      rateButton.disabled = false;
+
+      heading.textContent = `How was your experience at ${config.name || FALLBACK.name}?`;
+      rateBtn.disabled    = false;
     }
 
-    // ── HELPERS ──────────────────────────────────────────────────────────────────
-    function getRandomReview() {
-      const reviews = config.reviews || FALLBACK.reviews;
-      let idx = Math.floor(Math.random() * reviews.length);
-      while (reviews.length > 1 && idx === lastReviewIndex) {
-        idx = Math.floor(Math.random() * reviews.length);
+    // ── Generate review ─────────────────────────────────────────────────────────
+    async function generateReview() {
+      rateBtn.disabled   = true;
+      btnText.style.display    = 'none';
+      btnSpinner.style.display = 'flex';
+
+      let review    = null;
+      let aiGenerated = false;
+
+      // 1. Try AI backend
+      if (backendOnline) {
+        try {
+          const r = await fetch(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}`, { signal: AbortSignal.timeout(12000) });
+          if (r.ok) {
+            const data = await r.json();
+            if (data.generated && data.review) {
+              review      = data.review;
+              aiGenerated = true;
+            }
+          }
+        } catch { /* fall through to local */ }
       }
-      lastReviewIndex = idx;
-      return reviews[idx];
+
+      // 2. Fallback to local preset reviews
+      if (!review) {
+        const pool = config?.reviews || FALLBACK.reviews;
+        let idx    = Math.floor(Math.random() * pool.length);
+        while (pool.length > 1 && idx === lastReviewIdx) {
+          idx = Math.floor(Math.random() * pool.length);
+        }
+        lastReviewIdx = idx;
+        review        = pool[idx];
+      }
+
+      // Show result
+      reviewText.value = review;
+      reviewArea.classList.add('visible');
+      aiBadge.classList.toggle('visible', aiGenerated);
+      reviewText.focus();
+
+      rateBtn.disabled         = false;
+      btnText.style.display    = '';
+      btnSpinner.style.display = 'none';
+      btnText.textContent      = '↻ New Review';
     }
 
-    async function copyReview() {
+    // ── Copy + open Google ──────────────────────────────────────────────────────
+    async function copyAndOpen() {
       const text = reviewText.value.trim();
       try {
         await navigator.clipboard.writeText(text);
@@ -233,21 +326,15 @@
         reviewText.select();
         document.execCommand('copy');
       }
-      statusMessage.textContent = 'Review copied. Opening Google…';
-      window.open(config.googleReviewLink || FALLBACK.googleReviewLink, '_blank', 'noopener,noreferrer');
+      statusMsg.textContent = '✅ Copied! Paste it on the Google page that just opened.';
+      const link = config?.googleReviewLink || FALLBACK.googleReviewLink;
+      window.open(link, '_blank', 'noopener,noreferrer');
     }
 
-    // ── EVENTS ───────────────────────────────────────────────────────────────────
-    rateButton.addEventListener('click', () => {
-      reviewText.value = getRandomReview();
-      reviewArea.classList.add('is-visible');
-      reviewText.focus();
-    });
+    rateBtn.addEventListener('click', generateReview);
+    copyBtn.addEventListener('click', copyAndOpen);
 
-    copyButton.addEventListener('click', copyReview);
-
-    // ── BOOT ─────────────────────────────────────────────────────────────────────
-    loadConfig();
+    init();
   </script>
 </body>
 </html>

@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ScanQR Admin Panel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg:      #0f1117;
+    --surface: #1a1d27;
+    --card:    #21253a;
+    --border:  #2e3350;
+    --accent:  #6c63ff;
+    --accent2: #00d4aa;
+    --danger:  #ff4d6d;
+    --warn:    #f59e0b;
+    --text:    #e8eaf6;
+    --muted:   #8b8fa8;
+    --up:      #22c55e;
+    --down:    #ef4444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Login screen ─────────────────────────────── */
+  #loginScreen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px 36px;
+    width: min(100%, 400px);
+    text-align: center;
+  }
+
+  .logo {
+    font-size: 2.4rem;
+    margin-bottom: 6px;
+  }
+
+  .login-card h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; }
+  .login-card p  { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
+
+  input[type="password"], input[type="text"], input[type="url"], textarea, select {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.95rem;
+    transition: border 200ms;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  textarea { resize: vertical; min-height: 90px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 22px;
+    border: none;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 150ms, transform 100ms;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .btn-primary  { background: var(--accent);  color: #fff; width: 100%; justify-content: center; }
+  .btn-success  { background: var(--accent2); color: #000; }
+  .btn-danger   { background: var(--danger);  color: #fff; }
+  .btn-ghost    { background: var(--border);  color: var(--text); }
+  .btn-sm       { padding: 7px 14px; font-size: 0.82rem; border-radius: 8px; }
+
+  /* ── Main layout ──────────────────────────────── */
+  #app { display: none; min-height: 100vh; }
+
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .topbar .brand { font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; }
+  .topbar .spacer { flex: 1; }
+  .topbar .backend-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--up);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+  }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 28px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab {
+    padding: 14px 18px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 150ms, border 150ms;
+    user-select: none;
+  }
+
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .content { padding: 28px; max-width: 1100px; margin: 0 auto; }
+
+  /* ── Cards ────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin-bottom: 20px;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .card-header h3 { font-size: 1rem; font-weight: 600; }
+
+  /* ── Status badges ────────────────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .badge-up     { background: rgba(34,197,94,.15);  color: var(--up);    border: 1px solid rgba(34,197,94,.3);  }
+  .badge-down   { background: rgba(239,68,68,.15);  color: var(--down);  border: 1px solid rgba(239,68,68,.3);  }
+  .badge-nourl  { background: rgba(139,143,168,.1); color: var(--muted); border: 1px solid var(--border);       }
+  .badge-ai     { background: rgba(108,99,255,.15); color: var(--accent);border: 1px solid rgba(108,99,255,.3); }
+
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .dot-up   { background: var(--up);   box-shadow: 0 0 6px var(--up);   }
+  .dot-down { background: var(--down); box-shadow: 0 0 6px var(--down); }
+
+  /* ── Business grid ────────────────────────────── */
+  .biz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+
+  .biz-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+
+  .biz-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .biz-name { font-weight: 700; font-size: 1rem; }
+  .biz-slug { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+  .biz-actions { display: flex; gap: 8px; margin-top: 14px; }
+
+  /* ── Status table ─────────────────────────────── */
+  .status-table { width: 100%; border-collapse: collapse; }
+  .status-table th, .status-table td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+  .status-table th { color: var(--muted); font-weight: 500; }
+  .status-table tr:last-child td { border-bottom: none; }
+
+  /* ── Settings form ────────────────────────────── */
+  .settings-row { margin-bottom: 20px; }
+  .settings-row label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 7px; font-weight: 500; }
+
+  /* ── Edit modal overlay ───────────────────────── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 200;
+    place-items: center;
+  }
+
+  .modal-overlay.open { display: grid; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    width: min(100% - 32px, 520px);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal h3 { font-size: 1.05rem; margin-bottom: 20px; }
+  .modal .row { margin-bottom: 16px; }
+  .modal .row label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+  /* ── Stats row ────────────────────────────────── */
+  .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+  .stat-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; }
+  .stat-value { font-size: 1.7rem; font-weight: 700; }
+  .stat-value.up { color: var(--up); }
+  .stat-value.accent { color: var(--accent); }
+
+  /* ── Toast ────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 18px;
+    font-size: 0.88rem; font-weight: 500;
+    transform: translateY(80px); opacity: 0;
+    transition: all 300ms ease;
+    z-index: 999;
+  }
+
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { border-color: var(--up);     color: var(--up);   }
+  #toast.error   { border-color: var(--danger);  color: var(--danger); }
+
+  /* ── Add business form ────────────────────────── */
+  .add-form { display: none; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin-bottom: 20px; }
+  .add-form.open { display: block; }
+  .add-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 600px) { .add-form-grid { grid-template-columns: 1fr; } }
+
+  /* misc */
+  .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; }
+  .empty { color: var(--muted); font-size: 0.88rem; padding: 32px 0; text-align: center; }
+  .key-display { font-family: monospace; background: var(--bg); padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; color: var(--accent2); border: 1px solid var(--border); word-break: break-all; }
+
+  #loadingSpinner { display: none; text-align: center; padding: 40px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ── Login ──────────────────────────────────────────────────── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="logo">⚡</div>
+    <h1>ScanQR Admin</h1>
+    <p>Enter your admin API key to continue</p>
+    <input id="apiKeyInput" type="password" placeholder="Admin API key…" style="margin-bottom:14px">
+    <button class="btn btn-primary" onclick="login()">Sign In</button>
+    <p id="loginError" style="color:var(--danger);font-size:0.82rem;margin-top:12px;display:none">Invalid API key</p>
+  </div>
+</div>
+
+<!-- ── App ───────────────────────────────────────────────────── -->
+<div id="app">
+  <div class="topbar">
+    <div class="brand">⚡ ScanQR Admin</div>
+    <div class="spacer"></div>
+    <span id="backendBadge" class="backend-badge">● Backend Online</span>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('status',this)" id="tab-status">📊 Status</div>
+    <div class="tab" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
+    <div class="tab" onclick="switchTab('settings',this)" id="tab-settings">⚙️ Settings</div>
+  </div>
+
+  <div class="content">
+
+    <!-- ── STATUS tab ──────────────────────────────────────── -->
+    <div id="tab-content-status">
+      <div class="stats" id="statsRow"></div>
+      <div class="card">
+        <div class="card-header">
+          <h3>Site Status</h3>
+          <button class="btn btn-ghost btn-sm" onclick="loadStatus()">↻ Refresh</button>
+        </div>
+        <div id="loadingSpinner">Checking sites…</div>
+        <table class="status-table" id="statusTable">
+          <thead>
+            <tr>
+              <th>Business</th>
+              <th>Slug</th>
+              <th>URL</th>
+              <th>Status</th>
+              <th>Latency</th>
+            </tr>
+          </thead>
+          <tbody id="statusBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── BUSINESSES tab ──────────────────────────────────── -->
+    <div id="tab-content-businesses" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div class="section-title" style="margin:0">Registered Businesses</div>
+        <button class="btn btn-success btn-sm" onclick="toggleAddForm()">+ Add Business</button>
+      </div>
+
+      <div class="add-form" id="addForm">
+        <div style="font-weight:600;margin-bottom:16px">New Business</div>
+        <div class="add-form-grid">
+          <div class="row"><label>Slug (unique ID, no spaces)</label><input id="new-slug" type="text" placeholder="e.g. pink_salon"></div>
+          <div class="row"><label>Business Name</label><input id="new-name" type="text" placeholder="e.g. Pink Salon"></div>
+          <div class="row"><label>Business Type</label>
+            <select id="new-type">
+              <option value="salon">Salon</option>
+              <option value="hair salon">Hair Salon</option>
+              <option value="nail salon">Nail Salon</option>
+              <option value="spa">Spa</option>
+              <option value="beauty parlour">Beauty Parlour</option>
+              <option value="barbershop">Barbershop</option>
+              <option value="restaurant">Restaurant</option>
+              <option value="cafe">Cafe</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="row"><label>Google Review Link</label><input id="new-google" type="url" placeholder="https://g.page/r/xxx/review"></div>
+          <div class="row"><label>Vercel Site URL</label><input id="new-siteUrl" type="url" placeholder="https://your-site.vercel.app"></div>
+          <div class="row"><label>Override Gemini Key (optional)</label><input id="new-geminiKey" type="text" placeholder="Leave blank to use global key"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <button class="btn btn-primary btn-sm" onclick="addBusiness()">Save Business</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleAddForm()">Cancel</button>
+        </div>
+      </div>
+
+      <div class="biz-grid" id="bizGrid">
+        <div class="empty">Loading…</div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS tab ─────────────────────────────────────── -->
+    <div id="tab-content-settings" style="display:none">
+      <div class="card">
+        <div class="card-header"><h3>🔑 API Keys</h3></div>
+        <div class="settings-row">
+          <label>Gemini API Key (global — used for all businesses unless overridden)</label>
+          <input id="geminiKeyInput" type="text" placeholder="AIza…">
+        </div>
+        <div class="settings-row">
+          <label>Admin API Key (used to access this panel)</label>
+          <input id="adminKeyInput" type="password" placeholder="Current key hidden">
+        </div>
+        <div style="font-size:0.78rem;color:var(--warn);margin-bottom:16px">
+          ⚠️ Saving here updates in-memory only. Go to <strong>Render Dashboard → Environment</strong> to persist changes permanently.
+        </div>
+        <button class="btn btn-success btn-sm" onclick="saveSettings()">Save Keys</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>ℹ️ Quick Reference</h3></div>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px">Add a new business by setting a Render env var:</p>
+        <div class="key-display">BIZ_yourslug = {"name":"Business Name","type":"salon","googleReviewLink":"https://...","siteUrl":"https://your-site.vercel.app"}</div>
+        <p style="font-size:0.82rem;color:var(--muted);margin-top:12px">Then deploy a new Vercel site with <code style="background:var(--bg);padding:2px 6px;border-radius:4px">BUSINESS_SLUG = 'yourslug'</code></p>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<!-- ── Edit Modal ──────────────────────────────────────────────── -->
+<div class="modal-overlay" id="editModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>Edit Business</h3>
+    <input type="hidden" id="edit-slug">
+    <div class="row"><label>Business Name</label><input id="edit-name" type="text"></div>
+    <div class="row"><label>Business Type</label>
+      <select id="edit-type">
+        <option value="salon">Salon</option>
+        <option value="hair salon">Hair Salon</option>
+        <option value="nail salon">Nail Salon</option>
+        <option value="spa">Spa</option>
+        <option value="beauty parlour">Beauty Parlour</option>
+        <option value="barbershop">Barbershop</option>
+        <option value="restaurant">Restaurant</option>
+        <option value="cafe">Cafe</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="row"><label>Google Review Link</label><input id="edit-google" type="url"></div>
+    <div class="row"><label>Vercel Site URL (for status checks)</label><input id="edit-siteUrl" type="url"></div>
+    <div class="row"><label>Override Gemini Key (leave blank to use global)</label><input id="edit-geminiKey" type="text"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ───────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+  let API_KEY  = '';
+  const BASE   = window.location.origin; // same server
+
+  // ── Auth ────────────────────────────────────────────────────────────────────
+  async function login() {
+    const key = document.getElementById('apiKeyInput').value.trim();
+    if (!key) return;
+    try {
+      const r = await api('/admin/api/businesses', { key });
+      if (r.ok) {
+        API_KEY = key;
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        loadStatus();
+        loadBusinesses();
+      } else {
+        document.getElementById('loginError').style.display = 'block';
+      }
+    } catch {
+      document.getElementById('loginError').style.display = 'block';
+    }
+  }
+
+  function logout() {
+    API_KEY = '';
+    location.reload();
+  }
+
+  // ── API helper ──────────────────────────────────────────────────────────────
+  async function api(path, opts = {}) {
+    const { method = 'GET', body, key } = opts;
+    const r = await fetch(BASE + path, {
+      method,
+      headers: {
+        'x-api-key':    key || API_KEY,
+        'Content-Type': 'application/json'
+      },
+      ...(body ? { body: JSON.stringify(body) } : {})
+    });
+    return r;
+  }
+
+  async function apiJSON(path, opts) {
+    const r = await api(path, opts);
+    return r.json();
+  }
+
+  // ── Tabs ────────────────────────────────────────────────────────────────────
+  function switchTab(name, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    ['status','businesses','settings'].forEach(t => {
+      document.getElementById(`tab-content-${t}`).style.display = t === name ? '' : 'none';
+    });
+    if (name === 'status')      loadStatus();
+    if (name === 'businesses')  loadBusinesses();
+  }
+
+  // ── STATUS tab ──────────────────────────────────────────────────────────────
+  async function loadStatus() {
+    document.getElementById('loadingSpinner').style.display = 'block';
+    document.getElementById('statusBody').innerHTML = '';
+
+    try {
+      const data = await apiJSON('/admin/api/status');
+
+      // Stats row
+      const totalSites = data.sites.length;
+      const upSites    = data.sites.filter(s => s.status === 'up').length;
+      document.getElementById('statsRow').innerHTML = `
+        <div class="stat-card"><div class="stat-label">Backend</div><div class="stat-value up">Online</div></div>
+        <div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-value accent">${fmtUptime(data.backend.uptimeSeconds)}</div></div>
+        <div class="stat-card"><div class="stat-label">Sites Up</div><div class="stat-value up">${upSites} / ${totalSites}</div></div>
+        <div class="stat-card"><div class="stat-label">Gemini AI</div><div class="stat-value ${data.geminiConfigured ? 'up' : ''}" style="${data.geminiConfigured ? '' : 'color:var(--warn)'}">${data.geminiConfigured ? 'Configured' : 'Not Set'}</div></div>
+      `;
+
+      // Table
+      const tbody = document.getElementById('statusBody');
+      if (!data.sites.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">No businesses registered yet.</td></tr>';
+      } else {
+        tbody.innerHTML = data.sites.map(s => `
+          <tr>
+            <td>${s.name || s.slug}</td>
+            <td><code style="font-size:0.78rem;color:var(--accent)">${s.slug}</code></td>
+            <td>${s.url ? `<a href="${s.url}" target="_blank" style="color:var(--accent2)">${s.url}</a>` : '<span style="color:var(--muted)">—</span>'}</td>
+            <td>${statusBadge(s)}</td>
+            <td>${s.latencyMs != null ? `<span style="color:var(--muted)">${s.latencyMs}ms</span>` : '—'}</td>
+          </tr>
+        `).join('');
+      }
+    } catch (err) {
+      document.getElementById('backendBadge').textContent = '● Backend Offline';
+      document.getElementById('backendBadge').style.background = 'rgba(239,68,68,.15)';
+      document.getElementById('backendBadge').style.color = 'var(--down)';
+    }
+
+    document.getElementById('loadingSpinner').style.display = 'none';
+  }
+
+  function statusBadge(s) {
+    if (s.status === 'up')     return `<span class="badge badge-up"><span class="dot dot-up"></span>Online</span>`;
+    if (s.status === 'down')   return `<span class="badge badge-down"><span class="dot dot-down"></span>Down</span>`;
+    if (s.status === 'error')  return `<span class="badge badge-down">HTTP ${s.httpStatus}</span>`;
+    return `<span class="badge badge-nourl">No URL</span>`;
+  }
+
+  function fmtUptime(s) {
+    if (s < 60)   return `${s}s`;
+    if (s < 3600) return `${Math.floor(s/60)}m`;
+    return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+  }
+
+  // ── BUSINESSES tab ──────────────────────────────────────────────────────────
+  async function loadBusinesses() {
+    const grid = document.getElementById('bizGrid');
+    grid.innerHTML = '<div class="empty">Loading…</div>';
+    try {
+      const list = await apiJSON('/admin/api/businesses');
+      if (!list.length) { grid.innerHTML = '<div class="empty">No businesses yet. Click + Add Business.</div>'; return; }
+      grid.innerHTML = list.map(b => `
+        <div class="biz-card">
+          <div class="biz-card-header">
+            <div>
+              <div class="biz-name">${b.name || b.slug}</div>
+              <div class="biz-slug">slug: ${b.slug} · ${b.type || 'salon'}</div>
+            </div>
+            <span class="badge badge-ai">⚡ AI</span>
+          </div>
+          ${b.googleReviewLink ? `<div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔗 ${b.googleReviewLink}</div>` : ''}
+          ${b.siteUrl ? `<div style="font-size:0.78rem;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🌐 <a href="${b.siteUrl}" target="_blank" style="color:inherit">${b.siteUrl}</a></div>` : ''}
+          <div class="biz-actions">
+            <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(b)})'>✏️ Edit</button>
+            <button class="btn btn-success btn-sm" onclick="testReview('${b.slug}')">Test AI Review</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      grid.innerHTML = `<div class="empty">Error: ${err.message}</div>`;
+    }
+  }
+
+  function toggleAddForm() {
+    const f = document.getElementById('addForm');
+    f.classList.toggle('open');
+  }
+
+  async function addBusiness() {
+    const slug = document.getElementById('new-slug').value.trim().toLowerCase().replace(/\s+/g,'_');
+    if (!slug) { toast('Slug is required', 'error'); return; }
+
+    const body = {
+      name:            document.getElementById('new-name').value.trim(),
+      type:            document.getElementById('new-type').value,
+      googleReviewLink:document.getElementById('new-google').value.trim(),
+      siteUrl:         document.getElementById('new-siteUrl').value.trim(),
+      geminiApiKey:    document.getElementById('new-geminiKey').value.trim() || undefined
+    };
+
+    const r = await api(`/admin/api/config/${slug}`, { method: 'POST', body });
+    if (r.ok) {
+      toast('Business added! (update Render env var to persist)', 'success');
+      document.getElementById('addForm').classList.remove('open');
+      loadBusinesses();
+    } else {
+      toast('Failed to save', 'error');
+    }
+  }
+
+  // ── Edit modal ──────────────────────────────────────────────────────────────
+  function openEdit(b) {
+    document.getElementById('edit-slug').value      = b.slug;
+    document.getElementById('edit-name').value      = b.name || '';
+    document.getElementById('edit-type').value      = b.type || 'salon';
+    document.getElementById('edit-google').value    = b.googleReviewLink || '';
+    document.getElementById('edit-siteUrl').value   = b.siteUrl || '';
+    document.getElementById('edit-geminiKey').value = b.geminiApiKey || '';
+    document.getElementById('editModal').classList.add('open');
+  }
+
+  function closeModal() { document.getElementById('editModal').classList.remove('open'); }
+
+  async function saveEdit() {
+    const slug = document.getElementById('edit-slug').value;
+    const body = {
+      name:             document.getElementById('edit-name').value.trim(),
+      type:             document.getElementById('edit-type').value,
+      googleReviewLink: document.getElementById('edit-google').value.trim(),
+      siteUrl:          document.getElementById('edit-siteUrl').value.trim(),
+      geminiApiKey:     document.getElementById('edit-geminiKey').value.trim() || undefined
+    };
+    const r = await api(`/admin/api/config/${slug}`, { method: 'POST', body });
+    if (r.ok) {
+      toast('Saved! Update BIZ_' + slug + ' on Render to persist.', 'success');
+      closeModal();
+      loadBusinesses();
+    } else {
+      toast('Failed to save', 'error');
+    }
+  }
+
+  // ── Test AI review ──────────────────────────────────────────────────────────
+  async function testReview(slug) {
+    toast('Generating AI review…', 'success');
+    const r = await apiJSON(`/api/review/${slug}`);
+    if (r.generated) {
+      alert(`AI Review for "${slug}":\n\n"${r.review}"`);
+    } else {
+      alert(`Error: ${r.error}`);
+    }
+  }
+
+  // ── Settings ────────────────────────────────────────────────────────────────
+  async function saveSettings() {
+    const body = {
+      geminiApiKey: document.getElementById('geminiKeyInput').value.trim() || undefined,
+      adminApiKey:  document.getElementById('adminKeyInput').value.trim()  || undefined
+    };
+    const r = await api('/admin/api/settings', { method: 'POST', body });
+    if (r.ok) {
+      toast('Keys updated in-memory. Update Render env vars to persist.', 'success');
+      document.getElementById('geminiKeyInput').value = '';
+      document.getElementById('adminKeyInput').value  = '';
+    } else {
+      toast('Failed to save', 'error');
+    }
+  }
+
+  // ── Toast ────────────────────────────────────────────────────────────────────
+  function toast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className   = `show ${type}`;
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.remove('show'), 3500);
+  }
+
+  // ── Enter key on login ───────────────────────────────────────────────────────
+  document.getElementById('apiKeyInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') login();
+  });
+</script>
+</body>
+</html>
