@@ -8,15 +8,15 @@
     :root {
       --rose:       #c0395c;
       --rose-dark:  #9b2847;
-      --rose-light: rgba(192,57,92,0.12);
+      --rose-light: rgba(192,57,92,0.1);
       --gold:       #8a6c3e;
-      --cream:      #fff8f0;
-      --paper:      #fffcf9;
+      --cream:      #fffcf9;
+      --paper:      #ffffff;
       --ink:        #2d1f2b;
       --muted:      #7a5f70;
       --border:     rgba(160,100,120,0.18);
       --ring:       rgba(192,57,92,0.22);
-      --shadow:     0 18px 48px rgba(100,40,60,0.13);
+      --shadow:     0 20px 50px rgba(100,40,60,0.12);
     }
 
     * { box-sizing: border-box; }
@@ -24,11 +24,11 @@
     body {
       min-height: 100vh;
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(ellipse at top left, rgba(255,200,210,0.35), transparent 40%),
-        radial-gradient(ellipse at bottom right, rgba(255,230,190,0.3), transparent 40%),
+        radial-gradient(ellipse at top left, rgba(255,200,210,0.4), transparent 45%),
+        radial-gradient(ellipse at bottom right, rgba(255,230,190,0.35), transparent 45%),
         linear-gradient(150deg, #fff0f3 0%, #fff8f0 55%, #faf3e8 100%);
       display: grid;
       place-items: center;
@@ -39,9 +39,9 @@
       width: min(100%, 460px);
       background: var(--paper);
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 16px;
       box-shadow: var(--shadow);
-      padding: 28px 22px;
+      padding: 32px 24px;
     }
 
     .kicker {
@@ -49,7 +49,7 @@
       color: var(--rose);
       font-size: 0.74rem;
       font-weight: 700;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
     }
 
@@ -58,83 +58,81 @@
       font-size: clamp(1.5rem, 6.5vw, 2.1rem);
       line-height: 1.15;
       font-weight: 800;
+      color: var(--ink);
     }
 
     .subtext {
-      margin: 10px 0 20px;
+      margin: 10px 0 22px;
       color: var(--muted);
-      font-size: 0.92rem;
+      font-size: 0.94rem;
       line-height: 1.5;
     }
 
-    /* Input controls for customizing user review */
-    .section-label {
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: var(--muted);
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+    .review-card {
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      position: relative;
     }
 
-    .chips-group {
+    .review-header {
       display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-      margin-bottom: 16px;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
     }
 
-    .chip {
-      background: var(--cream);
-      border: 1px solid var(--border);
+    .stars {
+      color: #f59e0b;
+      font-size: 1.1rem;
+      letter-spacing: 2px;
+    }
+
+    .ai-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--rose);
+      background: var(--rose-light);
+      border: 1px solid rgba(192,57,92,0.2);
       border-radius: 20px;
-      padding: 6px 13px;
-      font-size: 0.84rem;
-      font-weight: 600;
-      color: var(--ink);
-      cursor: pointer;
-      user-select: none;
-      transition: all 150ms ease;
+      padding: 2px 9px;
     }
 
-    .chip:hover { border-color: var(--rose); }
-    .chip.active {
-      background: var(--rose);
-      color: #fff;
-      border-color: var(--rose);
-      box-shadow: 0 4px 12px rgba(192,57,92,0.22);
-    }
-
-    .staff-input {
+    textarea {
       width: 100%;
-      padding: 10px 14px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--cream);
+      min-height: 130px;
+      resize: vertical;
+      border: none;
+      background: transparent;
       color: var(--ink);
+      padding: 0;
       font: inherit;
-      font-size: 0.9rem;
-      margin-bottom: 18px;
-      transition: border 150ms;
+      font-size: 0.98rem;
+      line-height: 1.55;
     }
 
-    .staff-input:focus { outline: none; border-color: var(--rose); }
+    textarea:focus { outline: none; }
 
     /* Action buttons */
     button {
       width: 100%;
-      min-height: 52px;
+      min-height: 54px;
       border: 0;
-      border-radius: 10px;
+      border-radius: 12px;
       font: inherit;
-      font-size: 0.98rem;
+      font-size: 1.02rem;
       font-weight: 700;
       cursor: pointer;
       transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, opacity 150ms;
       touch-action: manipulation;
     }
 
-    button:focus-visible, textarea:focus-visible {
+    button:focus-visible {
       outline: 3px solid var(--ring);
       outline-offset: 2px;
     }
@@ -145,233 +143,147 @@
     .btn-primary {
       color: #fff;
       background: linear-gradient(135deg, var(--rose) 0%, #a82d4e 100%);
-      box-shadow: 0 8px 22px rgba(192,57,92,0.26);
+      box-shadow: 0 8px 24px rgba(192,57,92,0.28);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
 
     .btn-secondary {
       margin-top: 12px;
-      color: #fff;
-      background: linear-gradient(135deg, var(--gold) 0%, #6e5230 100%);
-      box-shadow: 0 8px 22px rgba(138,108,62,0.22);
-    }
-
-    .btn-secondary:hover:not(:disabled) { background: linear-gradient(135deg, #7a5e33 0%, #5c4327 100%); }
-
-    .review-area {
-      margin-top: 20px;
-    }
-
-    textarea {
-      width: 100%;
-      min-height: 125px;
-      resize: vertical;
+      color: var(--muted);
+      background: transparent;
       border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--cream);
-      color: var(--ink);
-      padding: 14px;
-      font: inherit;
-      font-size: 0.95rem;
-      line-height: 1.5;
+      font-size: 0.88rem;
+      min-height: 44px;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--rose-light);
+      color: var(--rose);
+      border-color: rgba(192,57,92,0.3);
     }
 
     .status {
-      min-height: 20px;
-      margin: 10px 0 0;
+      min-height: 22px;
+      margin: 12px 0 0;
       font-size: 0.88rem;
       font-weight: 600;
       color: var(--rose);
+      text-align: center;
     }
-
-    /* Badges */
-    .ai-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--rose);
-      background: var(--rose-light);
-      border: 1px solid rgba(192,57,92,0.2);
-      border-radius: 20px;
-      padding: 3px 10px;
-      margin-bottom: 8px;
-    }
-
-    .loading-wrap {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (min-width: 560px) {
-      main { padding: 34px 28px; }
+      main { padding: 36px 30px; }
     }
   </style>
 </head>
 <body>
   <main>
     <p class="kicker">✨ Quick Feedback</p>
-    <!-- Default heading renders immediately — zero waiting -->
     <h1 id="heading">How was your experience at Our Salon?</h1>
-    <p class="subtext">Select your service to generate your unique Google review.</p>
+    <p class="subtext">Your review has been pre-generated. Tap below to copy & post it on Google.</p>
 
-    <!-- Customization: Service Chips -->
-    <div class="section-label">Select Service</div>
-    <div class="chips-group" id="serviceChips">
-      <div class="chip active" data-value="Haircut">💇‍♀️ Haircut</div>
-      <div class="chip" data-value="Hair Color">🎨 Hair Color</div>
-      <div class="chip" data-value="Styling & Blowout">✂️ Styling</div>
-      <div class="chip" data-value="Manicure & Nails">💅 Nails</div>
-      <div class="chip" data-value="Facial & Spa">✨ Facial</div>
-    </div>
-
-    <!-- Customization: Optional Staff Name -->
-    <div class="section-label">Stylist Name (Optional)</div>
-    <input type="text" id="staffNameInput" class="staff-input" placeholder="e.g. Sarah, Alex...">
-
-    <!-- Customization: Vibe Chips -->
-    <div class="section-label">Atmosphere / Vibe</div>
-    <div class="chips-group" id="vibeChips">
-      <div class="chip active" data-value="Relaxing & Clean">🌸 Relaxing</div>
-      <div class="chip" data-value="Friendly & Professional">🌟 Professional</div>
-      <div class="chip" data-value="High-End & Luxurious">💎 Luxurious</div>
-      <div class="chip" data-value="Quick & Precise">⚡ Fast & Precise</div>
-    </div>
-
-    <!-- Review output area (auto-generated on load) -->
-    <section class="review-area" id="reviewArea">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span class="ai-badge" id="aiBadge">⚡ AI Generated</span>
+    <!-- Instant Pre-Generated AI Review Card -->
+    <div class="review-card">
+      <div class="review-header">
+        <div class="stars">★★★★★</div>
+        <span class="ai-badge" id="aiBadge">⚡ Ready</span>
       </div>
-      <textarea id="reviewText" placeholder="Generating your review..."></textarea>
-      
-      <button class="btn-primary" id="rateBtn" type="button">
-        <span id="btnText">✨ Regenerate Different Review</span>
-        <span id="btnSpinner" style="display:none" class="loading-wrap"><span class="spinner"></span> Generating…</span>
-      </button>
+      <textarea id="reviewText" placeholder="Loading your review..."></textarea>
+    </div>
 
-      <button class="btn-secondary" id="copyBtn" type="button">📋 Copy & Open Google</button>
-      <p class="status" id="statusMsg" role="status"></p>
-    </section>
+    <!-- Main 1-Tap CTA -->
+    <button class="btn-primary" id="copyBtn" type="button">
+      📋 Copy Review & Open Google
+    </button>
+
+    <!-- Regenerate option if user wants another text -->
+    <button class="btn-secondary" id="rateBtn" type="button">
+      ✨ Get Another Review
+    </button>
+
+    <p class="status" id="statusMsg" role="status"></p>
   </main>
 
   <script>
-    // ── CONFIG — change these 2 lines per business deployment ──────────────────
-    const BUSINESS_SLUG = 'demo';
-    const BACKEND_URL   = 'https://scan-qr-backend.onrender.com';
+    // ── CONFIG ──────────────────────────────────────────────────────────────────
+    const BUSINESS_SLUG       = 'demo';
+    const BACKEND_URL         = 'https://scan-qr-backend.onrender.com';
+    
+    // PLACEHOLDER GOOGLE REVIEW LINK (update this with your actual Google Maps place link)
+    const GOOGLE_REVIEW_LINK  = 'https://search.google.com/local/writereview?placeid=YOUR_PLACE_ID_HERE';
 
-    // ── FALLBACK SALON CONFIG & GENERATOR (used when backend/AI unavailable) ──
+    // ── FALLBACK REVIEWS ────────────────────────────────────────────────────────
     const FALLBACK = {
       name: 'Our Salon',
-      googleReviewLink: 'https://search.google.com/local/writereview',
-      type: 'salon'
+      googleReviewLink: GOOGLE_REVIEW_LINK,
+      reviews: [
+        'Absolutely loved my visit to Our Salon! The team was so welcoming, the space was spotless, and the service exceeded my expectations. Will definitely be returning soon!',
+        'Great experience at Our Salon. Super professional stylists, relaxing atmosphere, and left feeling very happy with my appointment!',
+        'Top tier salon! Warm hospitality, great expertise, and very reasonable pricing. 10/10 recommend to anyone looking for great service.',
+        'Loved my experience at Our Salon! Clean, cozy, and professional throughout. The staff truly care about their customers.'
+      ]
     };
 
     // ── STATE ───────────────────────────────────────────────────────────────────
     let config        = FALLBACK;
-    let backendOnline = false;
+    let lastReviewIdx = -1;
 
-    const heading        = document.getElementById('heading');
-    const rateBtn        = document.getElementById('rateBtn');
-    const btnText        = document.getElementById('btnText');
-    const btnSpinner     = document.getElementById('btnSpinner');
-    const reviewText     = document.getElementById('reviewText');
-    const copyBtn        = document.getElementById('copyBtn');
-    const statusMsg      = document.getElementById('statusMsg');
-    const aiBadge        = document.getElementById('aiBadge');
-    const staffNameInput = document.getElementById('staffNameInput');
+    const heading    = document.getElementById('heading');
+    const rateBtn    = document.getElementById('rateBtn');
+    const copyBtn    = document.getElementById('copyBtn');
+    const reviewText = document.getElementById('reviewText');
+    const statusMsg  = document.getElementById('statusMsg');
+    const aiBadge    = document.getElementById('aiBadge');
 
     // ── DYNAMIC LOCAL FALLBACK GENERATOR ───────────────────────────────────────
-    function getDynamicFallbackReview(service, staffName, vibe) {
-      const staffPart = staffName ? ` Shoutout to ${staffName} for being so attentive!` : '';
-      const servicePart = service ? ` for a ${service}` : '';
-      const vibePart = vibe ? ` The atmosphere was super ${vibe.toLowerCase()}.` : '';
-
-      const templates = [
-        `I had an absolute 5-star experience visiting ${config.name}${servicePart}!${staffPart}${vibePart} Everything was spotless and the staff truly cared about giving me the best result. Will definitely be returning soon!`,
-        `Highly recommend ${config.name}! Came in${servicePart} and left feeling completely refreshed.${staffPart}${vibePart} The quality of service and attention to detail is unbeatable.`,
-        `Top tier salon! Had a fantastic visit${servicePart}.${staffPart}${vibePart} Warm hospitality, great expertise, and very fair pricing. 10/10 recommend to anyone looking for amazing treatment.`,
-        `Loved my experience at ${config.name}!${staffPart} They did a wonderful job with my ${service || 'appointment'}.${vibePart} So clean, cozy, and professional throughout.`
-      ];
-
-      return templates[Math.floor(Math.random() * templates.length)];
+    function getFallbackReview() {
+      const pool = config?.reviews || FALLBACK.reviews;
+      let idx = Math.floor(Math.random() * pool.length);
+      while (pool.length > 1 && idx === lastReviewIdx) {
+        idx = Math.floor(Math.random() * pool.length);
+      }
+      lastReviewIdx = idx;
+      return pool[idx];
     }
 
-    // ── GET CURRENT SELECTED CUSTOMIZATION VALUES ──────────────────────────────
-    function getSelectedService() {
-      const active = document.querySelector('#serviceChips .chip.active');
-      return active ? active.dataset.value : '';
-    }
-
-    function getSelectedVibe() {
-      const active = document.querySelector('#vibeChips .chip.active');
-      return active ? active.dataset.value : '';
-    }
-
-    // ── GENERATE REVIEW (Fast FIFO Backend Queue with Dynamic Fallback) ───────
-    async function generateReview() {
-      rateBtn.disabled         = true;
-      btnText.style.display    = 'none';
-      btnSpinner.style.display = 'inline-flex';
-
-      const service   = getSelectedService();
-      const vibe      = getSelectedVibe();
-      const staffName = staffNameInput.value.trim();
-
-      let review      = null;
+    // ── FETCH / GENERATE REVIEW (Uses Fast Backend FIFO Queue) ────────────────
+    async function loadReview() {
+      rateBtn.disabled = true;
+      let review = null;
       let aiGenerated = false;
 
-      // Fast fetch from FIFO queue backend (returns < 50ms when warm)
       try {
         const ctrl = new AbortController();
-        const t    = setTimeout(() => ctrl.abort(), 2200); // 2.2s timeout max
+        const t = setTimeout(() => ctrl.abort(), 2000); // 2s timeout for instant queue fetch
 
-        const url = new URL(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}`);
-        if (service)   url.searchParams.append('service', service);
-        if (vibe)      url.searchParams.append('vibe', vibe);
-        if (staffName) url.searchParams.append('staffName', staffName);
-
-        const r = await fetch(url.toString(), { signal: ctrl.signal });
+        const r = await fetch(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}`, { signal: ctrl.signal });
         clearTimeout(t);
+
         if (r.ok) {
           const data = await r.json();
           if (data.review) {
-            review      = data.review;
+            review = data.review;
             aiGenerated = data.generated !== false;
           }
         }
       } catch {
-        /* backend offline / spinning up — fallback to dynamic generator */
+        /* backend spinning up or offline — use instant fallback */
       }
 
-      // If backend didn't respond in < 2.2s, use local dynamic review generator instantly
       if (!review) {
-        review      = getDynamicFallbackReview(service, staffName, vibe);
+        review = getFallbackReview();
         aiGenerated = false;
       }
 
-      // Render
       reviewText.value = review;
-      aiBadge.style.display = aiGenerated ? 'inline-flex' : 'none';
-
-      rateBtn.disabled         = false;
-      btnText.style.display    = 'inline';
-      btnSpinner.style.display = 'none';
+      aiBadge.textContent = aiGenerated ? '⚡ AI Generated' : '✨ Pre-Loaded';
+      rateBtn.disabled = false;
     }
 
-    // ── COPY & OPEN GOOGLE ─────────────────────────────────────────────────────
+    // ── COPY REVIEW AND OPEN GOOGLE REVIEW LINK ───────────────────────────────
     async function copyAndOpen() {
       const text = reviewText.value.trim();
       try {
@@ -380,56 +292,39 @@
         reviewText.select();
         document.execCommand('copy');
       }
-      statusMsg.textContent = '✅ Copied! Paste it on the Google page opening now.';
-      const link = config?.googleReviewLink || FALLBACK.googleReviewLink;
+      statusMsg.textContent = '✅ Copied! Opening Google Reviews...';
+
+      // Open Google Review Link (uses backend link or placeholder)
+      const link = config?.googleReviewLink || GOOGLE_REVIEW_LINK;
       window.open(link, '_blank', 'noopener,noreferrer');
     }
 
-    // ── CHIP SELECTION HANDLER ─────────────────────────────────────────────────
-    function setupChips(containerId) {
-      document.querySelectorAll(`#${containerId} .chip`).forEach(chip => {
-        chip.addEventListener('click', () => {
-          document.querySelectorAll(`#${containerId} .chip`).forEach(c => c.classList.remove('active'));
-          chip.classList.add('active');
-          generateReview(); // Auto regenerate when user tweaks input
-        });
-      });
-    }
-
-    // ── INITIALIZATION ─────────────────────────────────────────────────────────
+    // ── INITIALIZATION (Fires immediately on page open) ────────────────────────
     function init() {
-      // 1. Immediately set page heading
+      // 1. Instantly set heading & load initial review
       heading.textContent = `How was your experience at ${FALLBACK.name}?`;
+      loadReview();
 
-      // 2. Setup interactive chip listeners
-      setupChips('serviceChips');
-      setupChips('vibeChips');
-      staffNameInput.addEventListener('change', generateReview);
-
-      // 3. Auto-generate initial review on load immediately
-      generateReview();
-
-      // 4. Silently check backend in background
+      // 2. Fetch business config in background to update name/link if available
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 4000);
+      const timer = setTimeout(() => ctrl.abort(), 3500);
 
       fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`, { signal: ctrl.signal })
         .then(r => { clearTimeout(timer); return r.ok ? r.json() : null; })
         .then(data => {
           if (data && data.name) {
-            config        = data;
-            backendOnline = true;
+            config = data;
             heading.textContent = `How was your experience at ${config.name}?`;
           }
         })
-        .catch(() => { backendOnline = false; });
+        .catch(() => {});
     }
 
-    // Event bindings
-    rateBtn.addEventListener('click', generateReview);
+    // Event listeners
     copyBtn.addEventListener('click', copyAndOpen);
+    rateBtn.addEventListener('click', loadReview);
 
-    // Run
+    // Run on load
     init();
   </script>
 </body>
