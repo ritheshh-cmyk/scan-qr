@@ -316,10 +316,7 @@
         <div class="card-header">
           <h3>📥 Live FIFO Queue Messages Inspector</h3>
           <div style="display:flex;gap:10px;align-items:center;">
-            <select id="queueSlugSelect" style="width:auto;padding:6px 12px;font-size:0.85rem;" onchange="loadQueueInspector()">
-              <option value="saloon">Business: saloon</option>
-              <option value="demo">Business: demo</option>
-            </select>
+            <select id="queueSlugSelect" style="width:auto;padding:6px 12px;font-size:0.85rem;" onchange="loadQueueInspector()"></select>
             <button class="btn btn-ghost btn-sm" onclick="loadQueueInspector()">↻ Refresh Queue</button>
           </div>
         </div>
@@ -358,31 +355,32 @@
     <div id="tab-content-businesses" style="display:none">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
         <div class="section-title" style="margin:0">Registered Businesses</div>
-        <button class="btn btn-success btn-sm" onclick="toggleAddForm()">+ Add Business</button>
+        <button class="btn btn-success btn-sm" onclick="toggleAddForm()">+ Add New Business</button>
       </div>
 
       <div class="add-form" id="addForm">
-        <div style="font-weight:600;margin-bottom:16px">New Business</div>
+        <div style="font-weight:600;margin-bottom:16px">➕ Add New Business (Zero Code Required!)</div>
         <div class="add-form-grid">
-          <div class="row"><label>Slug (unique ID, no spaces)</label><input id="new-slug" type="text" placeholder="e.g. pink_salon"></div>
-          <div class="row"><label>Business Name</label><input id="new-name" type="text" placeholder="e.g. Pink Salon"></div>
-          <div class="row"><label>Business Type</label>
+          <div class="row"><label>Slug (unique ID, e.g. youngwear_fashions)</label><input id="new-slug" type="text" placeholder="e.g. youngwear_fashions"></div>
+          <div class="row"><label>Business Name</label><input id="new-name" type="text" placeholder="e.g. Youngwear Fashions"></div>
+          <div class="row"><label>Business Category / Type</label>
             <select id="new-type">
-              <option value="saloon">Saloon</option>
-              <option value="salon">Salon</option>
-              <option value="hair salon">Hair Salon</option>
-              <option value="nail salon">Nail Salon</option>
-              <option value="spa">Spa</option>
+              <option value="clothing store">Clothing Store / Fashion</option>
+              <option value="saloon">Saloon / Hair Care</option>
+              <option value="salon">Beauty Salon</option>
               <option value="barbershop">Barbershop</option>
-              <option value="restaurant">Restaurant</option>
+              <option value="spa">Spa & Wellness</option>
+              <option value="restaurant">Restaurant / Dining</option>
+              <option value="cafe">Cafe / Coffee Shop</option>
+              <option value="dental clinic">Dental / Medical Clinic</option>
+              <option value="gym">Gym / Fitness Center</option>
+              <option value="custom">Custom Category</option>
             </select>
           </div>
-          <div class="row"><label>Google Review Link</label><input id="new-google" type="url" placeholder="https://g.page/r/xxx/review"></div>
-          <div class="row"><label>Vercel Site URL</label><input id="new-siteUrl" type="url" placeholder="https://scanqr-beta.vercel.app"></div>
-          <div class="row"><label>Override Gemini Key (optional)</label><input id="new-geminiKey" type="text" placeholder="Leave blank to use global key"></div>
+          <div class="row"><label>Google Review Link</label><input id="new-google" type="url" placeholder="https://search.google.com/local/writereview?placeid=YOUR_ID"></div>
         </div>
-        <div style="display:flex;gap:10px;margin-top:14px">
-          <button class="btn btn-primary btn-sm" onclick="addBusiness()">Save Business</button>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-primary btn-sm" onclick="addBusiness()">Save & Activate Business</button>
           <button class="btn btn-ghost btn-sm" onclick="toggleAddForm()">Cancel</button>
         </div>
       </div>
@@ -398,14 +396,14 @@
         <div class="card-header"><h3>🔑 API Keys</h3></div>
         <div class="settings-row">
           <label>Gemini API Key (global — active on backend)</label>
-          <input id="geminiKeyInput" type="text" placeholder="AIzaSy…">
+          <input id="geminiKeyInput" type="text" placeholder="AQ.Ab8RN6…">
         </div>
         <div class="settings-row">
           <label>Admin API Key (used to access this panel — default: Lucky@000)</label>
           <input id="adminKeyInput" type="password" placeholder="Current key: Lucky@000">
         </div>
         <div style="font-size:0.78rem;color:var(--warn);margin-bottom:16px">
-          ⚠️ Saving here updates in-memory. Go to <strong>Render Dashboard → Environment</strong> to persist changes permanently.
+          ⚠️ Saving here updates in-memory instantly. Go to <strong>Render Dashboard → Environment</strong> to persist changes permanently.
         </div>
         <button class="btn btn-success btn-sm" onclick="saveSettings()">Save Keys</button>
       </div>
@@ -512,7 +510,7 @@
       document.getElementById('statsRow').innerHTML = `
         <div class="stat-card"><div class="stat-label">Backend</div><div class="stat-value up">Online</div></div>
         <div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-value accent">${fmtUptime(data.backend.uptimeSeconds)}</div></div>
-        <div class="stat-card"><div class="stat-label">Sites Up</div><div class="stat-value up">${upSites} / ${totalSites}</div></div>
+        <div class="stat-card"><div class="stat-label">Active Businesses</div><div class="stat-value up">${totalSites} Active</div></div>
         <div class="stat-card"><div class="stat-label">Gemini AI</div><div class="stat-value ${data.geminiConfigured ? 'up' : ''}" style="${data.geminiConfigured ? '' : 'color:var(--warn)'}">${data.geminiConfigured ? 'Configured' : 'Not Set'}</div></div>
       `;
 
@@ -541,15 +539,24 @@
 
   // ── QUEUE INSPECTOR tab ─────────────────────────────────────────────────────
   async function loadQueueInspector() {
-    const slug = document.getElementById('queueSlugSelect').value;
-    const container = document.getElementById('queueItemsContainer');
-    container.innerHTML = '<div class="empty">Loading active queue buffer…</div>';
-
     try {
+      const list = await apiJSON('/admin/api/businesses');
+      const select = document.getElementById('queueSlugSelect');
+      const currentVal = select.value;
+      
+      select.innerHTML = list.map(b => `<option value="${b.slug}">Business: ${b.name || b.slug} (${b.slug})</option>`).join('');
+      if (currentVal && list.some(b => b.slug === currentVal)) {
+        select.value = currentVal;
+      }
+
+      const slug = select.value || 'saloon';
+      const container = document.getElementById('queueItemsContainer');
+      container.innerHTML = '<div class="empty">Loading active queue buffer…</div>';
+
       const data = await apiJSON(`/admin/api/queue/${slug}`);
 
       document.getElementById('queueStatsSummary').textContent =
-        `Active Queue Buffer: ${data.queueLength} / ${data.maxSize} items ready for instant 0ms pop`;
+        `Active Queue Buffer for "${slug}": ${data.queueLength} / ${data.maxSize} items ready for instant 0ms pop`;
 
       if (!data.items.length) {
         container.innerHTML = '<div class="empty">Queue is empty right now.</div>';
@@ -566,7 +573,7 @@
         </div>
       `).join('');
     } catch (err) {
-      container.innerHTML = `<div class="empty">Error loading queue: ${err.message}</div>`;
+      document.getElementById('queueItemsContainer').innerHTML = `<div class="empty">Error loading queue: ${err.message}</div>`;
     }
   }
 
@@ -626,24 +633,28 @@
     grid.innerHTML = '<div class="empty">Loading…</div>';
     try {
       const list = await apiJSON('/admin/api/businesses');
-      if (!list.length) { grid.innerHTML = '<div class="empty">No businesses yet. Click + Add Business.</div>'; return; }
-      grid.innerHTML = list.map(b => `
+      if (!list.length) { grid.innerHTML = '<div class="empty">No businesses yet. Click + Add New Business.</div>'; return; }
+      grid.innerHTML = list.map(b => {
+        const siteUrl = b.siteUrl || `https://scanqr-beta.vercel.app?biz=${b.slug}`;
+        return `
         <div class="biz-card">
           <div class="biz-card-header">
             <div>
               <div class="biz-name">${b.name || b.slug}</div>
-              <div class="biz-slug">slug: ${b.slug} · ${b.type || 'saloon'}</div>
+              <div class="biz-slug">slug: <code>${b.slug}</code> · type: <strong>${b.type || 'business'}</strong></div>
             </div>
-            <span class="badge badge-ai">⚡ AI</span>
+            <span class="badge badge-ai">⚡ Live AI</span>
           </div>
-          ${b.googleReviewLink ? `<div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔗 ${b.googleReviewLink}</div>` : ''}
-          ${b.siteUrl ? `<div style="font-size:0.78rem;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🌐 <a href="${b.siteUrl}" target="_blank" style="color:inherit">${b.siteUrl}</a></div>` : ''}
+          ${b.googleReviewLink ? `<div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔗 ${b.googleReviewLink}</div>` : ''}
+          <div style="font-size:0.8rem;color:var(--accent2);background:var(--bg);padding:6px 10px;border-radius:6px;border:1px solid var(--border);margin-bottom:12px;word-break:break-all">
+            🌐 Vercel URL: <a href="${siteUrl}" target="_blank" style="color:var(--accent2);font-weight:600">${siteUrl}</a>
+          </div>
           <div class="biz-actions">
-            <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(b)})'>✏️ Edit</button>
             <button class="btn btn-success btn-sm" onclick="testReview('${b.slug}')">⚡ Test Gemini AI</button>
+            <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${siteUrl}');toast('Vercel URL Copied!','success')">📋 Copy URL</button>
           </div>
         </div>
-      `).join('');
+      `}).join('');
     } catch (err) {
       grid.innerHTML = `<div class="empty">Error: ${err.message}</div>`;
     }
@@ -658,20 +669,19 @@
     if (!slug) { toast('Slug is required', 'error'); return; }
 
     const body = {
-      name:            document.getElementById('new-name').value.trim(),
-      type:            document.getElementById('new-type').value,
-      googleReviewLink:document.getElementById('new-google').value.trim(),
-      siteUrl:         document.getElementById('new-siteUrl').value.trim(),
-      geminiApiKey:    document.getElementById('new-geminiKey').value.trim() || undefined
+      name:             document.getElementById('new-name').value.trim() || slug,
+      type:             document.getElementById('new-type').value,
+      googleReviewLink: document.getElementById('new-google').value.trim(),
+      siteUrl:          `https://scanqr-beta.vercel.app?biz=${slug}`
     };
 
     const r = await api(`/admin/api/config/${slug}`, { method: 'POST', body });
     if (r.ok) {
-      toast('Business added! (update Render env var to persist)', 'success');
+      toast(`Business "${body.name}" Added & Activated!`, 'success');
       document.getElementById('addForm').classList.remove('open');
       loadBusinesses();
     } else {
-      toast('Failed to save', 'error');
+      toast('Failed to save business', 'error');
     }
   }
 
@@ -680,7 +690,7 @@
     document.getElementById('aiTestModal').classList.add('open');
     document.getElementById('aiModalContent').innerHTML = `
       <div style="text-align:center;padding:20px;color:var(--muted);">
-        ⚡ Calling Gemini 1.5-flash AI for business "<strong>${slug}</strong>"…
+        ⚡ Calling Gemini AI model for business "<strong>${slug}</strong>"…
       </div>
     `;
 
@@ -692,17 +702,17 @@
         document.getElementById('aiModalContent').innerHTML = `
           <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;">
             <div style="font-size:1.02rem;line-height:1.55;color:var(--text);margin-bottom:14px;">"${data.review}"</div>
-            <div style="display:flex;gap:12px;font-size:0.8rem;color:var(--muted);border-top:1px solid var(--border);padding-top:12px;">
+            <div style="display:flex;gap:12px;font-size:0.8rem;color:var(--muted);border-top:1px solid var(--border);padding-top:12px;flex-wrap:wrap">
+              <span>🤖 Model: <strong>${data.modelUsed}</strong></span>
               <span>⚡ Latency: <strong>${data.latencyMs}ms</strong></span>
-              <span>📝 Length: <strong>${data.wordCount} words</strong></span>
-              <span>🎭 Persona: <strong>${data.persona.split(':')[0]}</strong></span>
+              <span>📝 Words: <strong>${data.wordCount}</strong></span>
             </div>
           </div>
-          <div style="font-size:0.82rem;color:var(--up);">✅ Gemini AI generation successful! Review ready.</div>
+          <div style="font-size:0.82rem;color:var(--up);">✅ Gemini AI generation successful for business "${slug}"!</div>
         `;
       } else {
         document.getElementById('aiModalContent').innerHTML = `
-          <div style="color:var(--danger);font-size:0.9rem;">
+          <div style="color:var(--danger);font-size:0.9rem;line-height:1.5;">
             ❌ Gemini AI Error: ${data.error || 'Failed to generate review. Check Gemini API key in Settings.'}
           </div>
         `;
@@ -720,38 +730,7 @@
     document.getElementById('aiTestModal').classList.remove('open');
   }
 
-  function openEdit(b) {
-    document.getElementById('edit-slug').value      = b.slug;
-    document.getElementById('edit-name').value      = b.name || '';
-    document.getElementById('edit-type').value      = b.type || 'saloon';
-    document.getElementById('edit-google').value    = b.googleReviewLink || '';
-    document.getElementById('edit-siteUrl').value   = b.siteUrl || '';
-    document.getElementById('edit-geminiKey').value = b.geminiApiKey || '';
-    document.getElementById('editModal').classList.add('open');
-  }
-
-  function closeModal() { document.getElementById('editModal').classList.remove('open'); }
-
-  async function saveEdit() {
-    const slug = document.getElementById('edit-slug').value;
-    const body = {
-      name:             document.getElementById('edit-name').value.trim(),
-      type:             document.getElementById('edit-type').value,
-      googleReviewLink: document.getElementById('edit-google').value.trim(),
-      siteUrl:          document.getElementById('edit-siteUrl').value.trim(),
-      geminiApiKey:     document.getElementById('edit-geminiKey').value.trim() || undefined
-    };
-    const r = await api(`/admin/api/config/${slug}`, { method: 'POST', body });
-    if (r.ok) {
-      toast('Saved! Update BIZ_' + slug + ' on Render to persist.', 'success');
-      closeModal();
-      loadBusinesses();
-    } else {
-      toast('Failed to save', 'error');
-    }
-  }
-
-  // ── SETTINGS tab (Auto-loads Gemini key for display) ────────────────────────
+  // ── SETTINGS tab ─────────────────────────────────────────────────────────────
   async function loadSettings() {
     try {
       const data = await apiJSON('/admin/api/settings');

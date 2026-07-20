@@ -15,13 +15,19 @@ const DEFAULT_BUSINESSES = {
     name: "Royal Saloon & Spa",
     type: "saloon",
     googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_SALOON_PLACE_ID",
-    siteUrl: "https://scanqr-beta.vercel.app"
+    siteUrl: "https://scanqr-beta.vercel.app?biz=saloon"
+  },
+  youngwear_fashions: {
+    name: "Youngwear Fashions",
+    type: "clothing store",
+    googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_YOUNGWEAR_PLACE_ID",
+    siteUrl: "https://scanqr-beta.vercel.app?biz=youngwear_fashions"
   },
   demo: {
     name: "Demo Beauty Salon",
     type: "salon",
     googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_DEMO_PLACE_ID",
-    siteUrl: "https://scanqr-beta.vercel.app"
+    siteUrl: "https://scanqr-beta.vercel.app?biz=demo"
   }
 };
 
@@ -112,9 +118,9 @@ function recordScanEvent(slug, meta, reviewSource) {
 // ── Multi-Angle Human Personas for Extreme Randomness ──────────────────────────
 const PERSONAS = [
   "Casual & Short: 2 snappy sentences, very natural, started lowercase, mobile user vibe.",
-  "Enthusiastic & Detailed: Happy customer praising the friendly staff, clean aesthetic, and great haircut/service.",
-  "Walk-in Direct: Focus on unexpected quick availability, fair pricing, clean towels/tools, great result.",
-  "Relaxing Spa Vibe: Focus on peaceful atmosphere, great smell, attentive stylist, leaving refreshed.",
+  "Enthusiastic & Detailed: Happy customer praising the friendly staff, clean aesthetic, and great products/service.",
+  "Walk-in Direct: Focus on unexpected quick availability, fair pricing, awesome quality, great result.",
+  "Cozy Vibe: Focus on peaceful atmosphere, great smell, attentive staff, leaving super satisfied.",
   "Minimalist 5-Star: 20 to 30 words, punchy, honest, 10/10 recommendation."
 ];
 
@@ -127,12 +133,24 @@ function seedQueueIfEmpty(slug, config) {
   if (!reviewQueues[slug]) reviewQueues[slug] = [];
 
   if (reviewQueues[slug].length === 0) {
-    const name = config.name || 'Royal Saloon & Spa';
-    const initialSeedReviews = [
-      `honestly so happy with my visit to ${name}! staff were super friendly, clean place, and service was 10/10. definitely coming back.`,
-      `Great experience at ${name}. Walked in and was greeted warmly right away. Very skilled team and relaxing vibe. Highly recommend!`,
-      `Best saloon visit I've had in a while. Spotless clean, fair prices, and my stylist did an awesome job. Will be back for sure!`
-    ];
+    const name = config.name || slug;
+    const type = config.type || 'store';
+    
+    let initialSeedReviews = [];
+    if (type.includes('clothing') || type.includes('fashion') || type.includes('boutique')) {
+      initialSeedReviews = [
+        `honestly so happy with my shopping at ${name}! great clothing collection, fitting was spot on, and staff were super helpful 10/10.`,
+        `Loved my visit to ${name}. Beautiful clothes, awesome quality, and fair prices. Definitely coming back for more outfits!`,
+        `Best fashion store in town! Spotless clean shop, friendly team, and got exactly what I was looking for. 5 stars!`
+      ];
+    } else {
+      initialSeedReviews = [
+        `honestly so happy with my visit to ${name}! staff were super friendly, clean place, and service was 10/10. definitely coming back.`,
+        `Great experience at ${name}. Walked in and was greeted warmly right away. Very skilled team and relaxing vibe. Highly recommend!`,
+        `Best visit I've had in a while. Spotless clean, fair prices, and the team did an awesome job. Will be back for sure!`
+      ];
+    }
+
     initialSeedReviews.forEach(rev => {
       reviewQueues[slug].push({
         review: rev,
@@ -188,8 +206,8 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
 
   if (!geminiKey) return;
 
-  const type = config.type || 'saloon';
-  const name = config.name || 'Royal Saloon & Spa';
+  const type = config.type || 'business';
+  const name = config.name || slug;
 
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
@@ -199,7 +217,7 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
     `Style persona: ${selectedPersona}\n` +
     `Include a natural casual phrase like "${selectedPhrase}".\n` +
-    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
+    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus on realistic details for a ${type}. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
 
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
@@ -277,9 +295,9 @@ async function handleReviewRequest(req, res) {
   });
 
   if (!reviewObj) {
-    const name = config.name || 'Royal Saloon & Spa';
+    const name = config.name || 'Our Store';
     reviewObj = {
-      review: `honestly loved my visit to ${name}! clean place, friendly staff, and great service. 10/10 recommend.`,
+      review: `honestly loved my visit to ${name}! clean place, friendly staff, and great quality. 10/10 recommend.`,
       generated: false,
       source: 'instant-human-fallback',
       timestamp: Date.now()
@@ -307,8 +325,8 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
     return res.status(503).json({ error: 'Gemini API Key is missing. Enter a valid key in Settings tab.', generated: false });
   }
 
-  const type = config.type || 'saloon';
-  const name = config.name || 'Royal Saloon & Spa';
+  const type = config.type || 'business';
+  const name = config.name || slug;
 
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
@@ -318,7 +336,7 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
     `Style persona: ${selectedPersona}\n` +
     `Include a natural casual phrase like "${selectedPhrase}".\n` +
-    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
+    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus on realistic details for a ${type}. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
 
   const t0 = Date.now();
   try {
@@ -408,6 +426,12 @@ app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(400).json({ error: 'Empty body' });
   }
+
+  // Auto-fill siteUrl if not provided
+  if (!req.body.siteUrl) {
+    req.body.siteUrl = `https://scanqr-beta.vercel.app?biz=${slug}`;
+  }
+
   process.env[`BIZ_${slug}`] = JSON.stringify(req.body);
   res.json({ success: true, config: req.body });
 });
@@ -460,5 +484,5 @@ app.get('/admin', (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v6.4 running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v8.0 (Universal Multi-Business Engine) running on port ${PORT}`);
 });

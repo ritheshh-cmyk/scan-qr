@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Opening Google Reviews…</title>
+  <title id="pageTitle">Opening Google Reviews…</title>
   <style>
     :root {
       --rose:       #c0395c;
@@ -75,8 +75,8 @@
 </head>
 <body onclick="handleTap()">
   <main>
-    <div class="icon">💇‍♀️</div>
-    <h1 id="heading">Opening Saloon Google Reviews…</h1>
+    <div class="icon" id="bizIcon">🛍️</div>
+    <h1 id="heading">Opening Google Reviews…</h1>
     <p class="subtext">Review copied! Redirecting automatically.</p>
 
     <button class="btn-tap" id="mainBtn" type="button">
@@ -85,37 +85,51 @@
   </main>
 
   <script>
-    // ── MULTI-BUSINESS CONFIG & SLUG DETECTION ─────────────────────────────────
+    // ── UNIVERSAL MULTI-BUSINESS CONFIG & SLUG ROUTER ──────────────────────────
     const urlParams     = new URLSearchParams(window.location.search);
     const BUSINESS_SLUG = urlParams.get('biz') || urlParams.get('slug') || urlParams.get('business') || 'saloon';
     const BACKEND_URL    = 'https://scan-qr-backend.onrender.com';
     
     // DEFAULT PLACEHOLDER GOOGLE REVIEW LINK (overridden dynamically by business config)
-    let googleReviewLink = 'https://search.google.com/local/writereview?placeid=YOUR_SALOON_PLACE_ID';
+    let googleReviewLink = 'https://search.google.com/local/writereview?placeid=YOUR_PLACE_ID';
+
+    // ── UNIVERSAL CATEGORY ICONS ───────────────────────────────────────────────
+    function getCategoryIcon(type) {
+      const t = (type || '').toLowerCase();
+      if (t.includes('clothing') || t.includes('fashion') || t.includes('apparel')) return '👗';
+      if (t.includes('saloon') || t.includes('salon') || t.includes('hair')) return '💇‍♀️';
+      if (t.includes('barber')) return '💈';
+      if (t.includes('spa') || t.includes('massage')) return '🧖‍♀️';
+      if (t.includes('food') || t.includes('restaurant') || t.includes('pizza')) return '🍕';
+      if (t.includes('cafe') || t.includes('coffee')) return '☕';
+      if (t.includes('dental') || t.includes('doctor')) return '🦷';
+      if (t.includes('gym') || t.includes('fitness')) return '🏋️‍♂️';
+      return '🛍️';
+    }
 
     // ── COMBINATORIAL HUMAN REVIEW FALLBACK ────────────────────────────────────
     const OPENINGS = [
-      'honestly so happy with my saloon visit!',
-      'Great experience at this saloon.',
-      'Best haircut and saloon visit I\'ve had in a long time.',
-      'Super clean saloon space and welcoming energy.',
-      'Top tier saloon service from start to finish!',
-      'Walked in today and left feeling fresh & handsome.',
-      'Loved my hair appointment here today.'
+      'honestly so happy with my visit!',
+      'Great experience here.',
+      'Best customer service and quality I\'ve had in a long time.',
+      'Super clean space and welcoming energy.',
+      'Top tier service from start to finish!',
+      'Walked in today and left feeling super satisfied.',
+      'Loved my experience here today.'
     ];
     const MIDDLES = [
       'Staff were super friendly and listened to exactly what I wanted.',
-      'Spotless clean, relaxing atmosphere, and very skilled stylists.',
-      'Quick in and out, pricing is super fair, and service quality is 10/10.',
+      'Spotless clean, relaxing atmosphere, and very skilled team.',
+      'Quick in and out, pricing is super fair, and quality is 10/10.',
       'Attention to detail was amazing and the environment is so comfortable.',
-      'Warm hospitality, great expertise, and awesome haircut.'
+      'Warm hospitality, great expertise, and awesome quality.'
     ];
     const CLOSINGS = [
       'Definitely coming back!',
-      'Highly recommend this saloon to everyone.',
+      'Highly recommend to everyone.',
       'Will be back for sure!',
       '5 stars hands down.',
-      'My new favorite saloon!'
+      'My new favorite place!'
     ];
 
     function generateUniqueReview() {
@@ -157,12 +171,20 @@
       doRedirect();
     }
 
-    // ── PRE-LOAD BUSINESS CONFIG (Name & Google Review Link) ────────────────────
+    // ── DYNAMICALLY LOAD BUSINESS CONFIG FROM BACKEND ──────────────────────────
     fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`)
       .then(r => r.ok ? r.json() : null)
       .then(cfg => {
-        if (cfg && cfg.googleReviewLink) googleReviewLink = cfg.googleReviewLink;
-        if (cfg && cfg.name) document.getElementById('heading').textContent = `Opening ${cfg.name} Reviews…`;
+        if (cfg) {
+          if (cfg.googleReviewLink) googleReviewLink = cfg.googleReviewLink;
+          if (cfg.name) {
+            document.getElementById('heading').textContent = `Opening ${cfg.name} Reviews…`;
+            document.getElementById('pageTitle').textContent = `Opening ${cfg.name} Reviews…`;
+          }
+          if (cfg.type) {
+            document.getElementById('bizIcon').textContent = getCategoryIcon(cfg.type);
+          }
+        }
       })
       .catch(() => {});
 
