@@ -252,16 +252,16 @@
     const statusMsg  = document.getElementById('statusMsg');
     const aiBadge    = document.getElementById('aiBadge');
 
-    // ── BOOT: show fallback immediately, load backend silently in background ──────
+    // ── BOOT: show fallback immediately, check backend in background ──────────
     function init() {
-      // 1. Enable page instantly with fallback — never block on network
+      // 1. Instantly render fallback config — zero waiting for user
       config = FALLBACK;
       heading.textContent = `How was your experience at ${FALLBACK.name}?`;
       rateBtn.disabled    = false;
 
-      // 2. Try backend in background (Render free tier may cold-start 20-30s)
+      // 2. Silently fetch backend config in background with short 4s timeout
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
+      const timer = setTimeout(() => controller.abort(), 4000);
 
       fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`, { signal: controller.signal })
         .then(r => { clearTimeout(timer); return r.ok ? r.json() : null; })
@@ -272,35 +272,41 @@
             heading.textContent = `How was your experience at ${config.name}?`;
           }
         })
-        .catch(() => { /* backend offline — fallback already active */ });
+        .catch(() => {
+          backendOnline = false;
+        });
     }
 
     // ── Generate review ─────────────────────────────────────────────────────────
     async function generateReview() {
-      rateBtn.disabled   = true;
+      rateBtn.disabled         = true;
       btnText.style.display    = 'none';
       btnSpinner.style.display = 'flex';
 
-      let review    = null;
+      let review      = null;
       let aiGenerated = false;
 
-      // 1. Try AI backend (works whether config came from backend or fallback)
-      try {
-        const ctrl = new AbortController();
-        const t    = setTimeout(() => ctrl.abort(), 15000);
-        const r    = await fetch(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}`, { signal: ctrl.signal });
-        clearTimeout(t);
-        if (r.ok) {
-          const data = await r.json();
-          if (data.generated && data.review) {
-            review        = data.review;
-            aiGenerated   = true;
-            backendOnline = true; // mark online now if it warmed up
+      // Only attempt network AI generation if backend is known to be online
+      if (backendOnline) {
+        try {
+          const ctrl = new AbortController();
+          const t    = setTimeout(() => ctrl.abort(), 4000); // 4s timeout max for AI
+          const r    = await fetch(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}`, { signal: ctrl.signal });
+          clearTimeout(t);
+          if (r.ok) {
+            const data = await r.json();
+            if (data.generated && data.review) {
+              review      = data.review;
+              aiGenerated = true;
+            }
           }
+        } catch {
+          // If fetch fails or times out, mark backend offline for future clicks
+          backendOnline = false;
         }
-      } catch { /* fall through to local */ }
+      }
 
-      // 2. Fallback to local preset reviews
+      // If AI review not fetched or backend unavailable, instantly use preloaded message
       if (!review) {
         const pool = config?.reviews || FALLBACK.reviews;
         let idx    = Math.floor(Math.random() * pool.length);
@@ -311,7 +317,7 @@
         review        = pool[idx];
       }
 
-      // Show result
+      // Render result
       reviewText.value = review;
       reviewArea.classList.add('visible');
       aiBadge.classList.toggle('visible', aiGenerated);
