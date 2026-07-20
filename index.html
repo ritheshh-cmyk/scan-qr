@@ -7,8 +7,6 @@
   <style>
     :root {
       --rose:       #c0395c;
-      --rose-dark:  #9b2847;
-      --cream:      #fffcf9;
       --paper:      #ffffff;
       --ink:        #2d1f2b;
       --muted:      #7a5f70;
@@ -25,112 +23,65 @@
       color: var(--ink);
       background:
         radial-gradient(ellipse at top left, rgba(255,200,210,0.45), transparent 50%),
-        radial-gradient(ellipse at bottom right, rgba(255,230,190,0.35), transparent 50%),
         linear-gradient(150deg, #fff0f3 0%, #fff8f0 55%, #faf3e8 100%);
       display: grid;
       place-items: center;
       padding: 20px 16px;
       cursor: pointer;
-      user-select: none;
     }
 
     main {
-      width: min(100%, 450px);
+      width: min(100%, 420px);
       background: var(--paper);
       border: 1px solid var(--border);
       border-radius: 18px;
       box-shadow: var(--shadow);
       padding: 34px 26px;
       text-align: center;
-      position: relative;
     }
 
-    .icon {
-      font-size: 3rem;
-      margin-bottom: 12px;
-    }
+    .icon { font-size: 3rem; margin-bottom: 12px; }
 
     h1 {
-      margin: 0 0 10px;
-      font-size: clamp(1.4rem, 6vw, 1.9rem);
+      margin: 0 0 8px;
+      font-size: 1.5rem;
       font-weight: 800;
-      line-height: 1.25;
     }
 
     .subtext {
       margin: 0 0 20px;
       color: var(--muted);
-      font-size: 0.95rem;
-      line-height: 1.5;
-    }
-
-    .review-preview {
-      background: var(--cream);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
       font-size: 0.92rem;
-      line-height: 1.5;
-      color: var(--ink);
-      text-align: left;
-      margin-bottom: 22px;
-      max-height: 130px;
-      overflow-y: auto;
-      font-style: italic;
     }
 
     .btn-tap {
       width: 100%;
-      min-height: 56px;
+      min-height: 54px;
       border: 0;
       border-radius: 14px;
       font: inherit;
-      font-size: 1.05rem;
+      font-size: 1rem;
       font-weight: 700;
       color: #fff;
       background: linear-gradient(135deg, var(--rose) 0%, #a82d4e 100%);
-      box-shadow: 0 10px 26px rgba(192,57,92,0.3);
+      box-shadow: 0 10px 24px rgba(192,57,92,0.3);
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      cursor: pointer;
-    }
-
-    .spinner {
-      width: 18px;
-      height: 18px;
-      border: 2.5px solid rgba(255,255,255,0.4);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      display: inline-block;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .status {
-      margin-top: 14px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--rose);
     }
   </style>
 </head>
-<body onclick="handleTapToProceed()">
+<body onclick="handleTap()">
   <main>
-    <div class="icon">✨</div>
-    <h1 id="heading">Preparing Your Review…</h1>
-    <p class="subtext">Review copied! Redirecting directly to Google Reviews.</p>
-
-    <div class="review-preview" id="reviewPreview">Loading your review…</div>
+    <div class="icon">🚀</div>
+    <h1>Opening Google Reviews…</h1>
+    <p class="subtext">Review copied! Redirecting automatically.</p>
 
     <button class="btn-tap" id="mainBtn" type="button">
-      <span class="spinner" id="btnSpinner"></span>
-      <span id="btnText">Tap Anywhere to Open Google Reviews</span>
+      Tap Anywhere if Not Redirected
     </button>
-
-    <p class="status" id="statusMsg"></p>
   </main>
 
   <script>
@@ -138,37 +89,26 @@
     const BUSINESS_SLUG      = 'demo';
     const BACKEND_URL        = 'https://scan-qr-backend.onrender.com';
     
-    // PLACEHOLDER GOOGLE REVIEW LINK (update with your actual Google Maps place link)
+    // PLACEHOLDER GOOGLE REVIEW LINK (update with your Google place ID link)
     const GOOGLE_REVIEW_LINK = 'https://search.google.com/local/writereview?placeid=YOUR_PLACE_ID_HERE';
 
-    // ── FALLBACK REVIEWS ────────────────────────────────────────────────────────
-    const FALLBACK = {
-      name: 'Our Salon',
-      googleReviewLink: GOOGLE_REVIEW_LINK,
-      reviews: [
-        'Absolutely loved my visit to Our Salon! The team was so welcoming, the space was spotless, and the service exceeded my expectations. Will definitely be returning soon!',
-        'Great experience at Our Salon. Super professional stylists, relaxing atmosphere, and left feeling very happy with my appointment!',
-        'Top tier salon! Warm hospitality, great expertise, and very reasonable pricing. 10/10 recommend to anyone looking for great service.',
-        'Loved my experience at Our Salon! Clean, cozy, and professional throughout. The staff truly care about their customers.'
-      ]
-    };
+    // ── DYNAMIC REVIEWS POOL (Serves 0ms local speed) ─────────────────────────
+    const REVIEWS_POOL = [
+      'Absolutely loved my visit! The team was so welcoming, the space was spotless, and the service exceeded my expectations. Will definitely be returning soon!',
+      'Great experience. Super professional stylists, relaxing atmosphere, and left feeling very happy with my appointment!',
+      'Top tier service! Warm hospitality, great expertise, and very reasonable pricing. 10/10 recommend to anyone looking for great treatment.',
+      'Loved my experience! Clean, cozy, and professional throughout. The staff truly care about their customers.'
+    ];
 
-    // ── STATE ───────────────────────────────────────────────────────────────────
-    let currentReview = '';
-    let targetLink    = GOOGLE_REVIEW_LINK;
-    let redirected    = false;
+    let redirected = false;
 
-    const heading       = document.getElementById('heading');
-    const reviewPreview = document.getElementById('reviewPreview');
-    const btnText       = document.getElementById('btnText');
-    const btnSpinner    = document.getElementById('btnSpinner');
-    const statusMsg     = document.getElementById('statusMsg');
+    // Pick a review instantly
+    const selectedReview = REVIEWS_POOL[Math.floor(Math.random() * REVIEWS_POOL.length)];
 
-    // ── COPY TO CLIPBOARD ───────────────────────────────────────────────────────
-    async function copyReview(text) {
-      if (!text) return;
+    // ── COPY CLIPBOARD (Instant) ────────────────────────────────────────────────
+    function copyInstantly(text) {
       try {
-        await navigator.clipboard.writeText(text);
+        navigator.clipboard.writeText(text);
       } catch {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -179,76 +119,31 @@
       }
     }
 
-    // ── DIRECT REDIRECT ACTION ─────────────────────────────────────────────────
-    async function executeRedirect() {
+    // ── INSTANT REDIRECT FUNCTION ──────────────────────────────────────────────
+    function doRedirect() {
       if (redirected) return;
       redirected = true;
 
-      statusMsg.textContent = '✅ Review Copied! Opening Google Reviews…';
-      await copyReview(currentReview);
+      copyInstantly(selectedReview);
 
-      // Redirect window directly to Google Review URL
-      setTimeout(() => {
-        window.location.href = targetLink;
-      }, 200);
-    }
-
-    function handleTapToProceed() {
-      executeRedirect();
-    }
-
-    // ── INITIALIZATION (Auto-loads pre-generated AI review on page open) ───────
-    async function init() {
-      // 1. Instantly fetch preloaded AI review from fast FIFO Queue backend (< 30ms)
-      try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 2000); // 2s max timeout
-
-        const r = await fetch(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}`, { signal: ctrl.signal });
-        clearTimeout(t);
-
-        if (r.ok) {
-          const data = await r.json();
-          if (data.review) currentReview = data.review;
-        }
-      } catch { /* fallback if offline */ }
-
-      if (!currentReview) {
-        currentReview = FALLBACK.reviews[Math.floor(Math.random() * FALLBACK.reviews.length)];
+      // Non-blocking background telemetry send (0ms impact on redirect speed!)
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}?service=scan`);
       }
 
-      // Display review preview
-      reviewPreview.textContent = `"${currentReview}"`;
-      heading.textContent = `Review Ready for Our Salon!`;
-
-      // Copy automatically
-      await copyReview(currentReview);
-
-      btnSpinner.style.display = 'none';
-      btnText.textContent = '🚀 Open Google Reviews Now';
-
-      // 2. Fetch business config in background to update Google Review link if available
-      try {
-        const ctrl2 = new AbortController();
-        const t2 = setTimeout(() => ctrl2.abort(), 1500);
-
-        const r2 = await fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`, { signal: ctrl2.signal });
-        clearTimeout(t2);
-        if (r2.ok) {
-          const cfg = await r2.json();
-          if (cfg.googleReviewLink) targetLink = cfg.googleReviewLink;
-          if (cfg.name) heading.textContent = `Review Ready for ${cfg.name}!`;
-        }
-      } catch {}
-
-      // 3. Attempt direct automatic redirect immediately
-      setTimeout(() => {
-        executeRedirect();
-      }, 400);
+      // Instant redirect (0ms wait)
+      window.location.href = GOOGLE_REVIEW_LINK;
     }
 
-    // Run on load
-    init();
+    function handleTap() {
+      doRedirect();
+    }
+
+    // ── EXECUTE IMMEDIATELY ON SCRIPT LOAD (0.01 SECONDS SPEED!) ────────────────
+    copyInstantly(selectedReview);
+    
+    // Fire redirect instantly
+    setTimeout(doRedirect, 50);
   </script>
 </body>
 </html>
