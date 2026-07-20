@@ -42,7 +42,8 @@ const analyticsStore = {
   uniqueIps: new Set(),
   deviceStats: { Smartphone: 0, Desktop: 0 },
   timeStats: { Morning: 0, Afternoon: 0, Evening: 0 },
-  logs: [] // max 100 recent scan logs
+  sourceStats: { 'Gemini AI Queue': 0, 'Initial Seed Queue': 0, 'Instant Fallback': 0 },
+  logs: []
 };
 
 function recordScanEvent(slug, meta, reviewSource) {
@@ -55,6 +56,9 @@ function recordScanEvent(slug, meta, reviewSource) {
   const tod = meta.timeOfDay || 'Afternoon';
   analyticsStore.timeStats[tod] = (analyticsStore.timeStats[tod] || 0) + 1;
 
+  const src = reviewSource || 'FIFO Queue';
+  analyticsStore.sourceStats[src] = (analyticsStore.sourceStats[src] || 0) + 1;
+
   analyticsStore.logs.unshift({
     id: Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
     timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -63,7 +67,7 @@ function recordScanEvent(slug, meta, reviewSource) {
     ip: meta.ip || '127.0.0.1',
     deviceType: device,
     timeOfDay: tod,
-    source: reviewSource || 'FIFO Queue'
+    source: src
   });
 
   if (analyticsStore.logs.length > 100) {
@@ -254,10 +258,8 @@ async function handleReviewRequest(req, res) {
     reviewObj = queue.shift();
   }
 
-  // Record scan in real-time analytics
   recordScanEvent(slug, clientMeta, reviewObj ? (reviewObj.generated ? 'Gemini AI Queue' : 'Initial Seed Queue') : 'Instant Fallback');
 
-  // Asynchronous queue replenishment worker
   setImmediate(() => {
     generateAndEnqueueReview(slug, clientMeta, customInput);
   });
@@ -283,6 +285,79 @@ async function handleReviewRequest(req, res) {
 app.get('/api/review/:slug', handleReviewRequest);
 app.post('/api/review/:slug', handleReviewRequest);
 
+// ── ADMIN: Direct AI Review Tester ─────────────────────────────────────────────
+app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
+  const slug   = sanitizeSlug(req.params.slug) || 'saloon';
+  const config = getBizConfig(slug) || DEFAULT_BUSINESSES.saloon;
+  const geminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
+
+  if (!geminiKey) {
+    return res.status(503).json({ error: 'Gemini API key not configured on backend', generated: false });
+  }
+
+  const type = config.type || 'saloon';
+  const name = config.name || 'Royal Saloon & Spa';
+
+  const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
+  const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
+  const randomSeed      = `${Date.now()}_${Math.floor(Math.random() * 999999)}`;
+
+  const systemInstruction =
+    `You are a real everyday person writing a quick 5-star Google review for "${name}", a ${type}.\n` +
+    `CRITICAL INSTRUCTIONS FOR REALISTIC HUMAN TONE:\n` +
+    `1. NEVER sound like an AI, marketing brochure, or corporate copywriter.\n` +
+    `2. Style direction: ${selectedPersona}\n` +
+    `3. Write between 25 and 45 words. Keep it short and natural.\n` +
+    `4. Output ONLY the plain text of the review. No quotes, no preamble, no hashtags, no title.`;
+
+  const prompt = `Write a completely unique, natural 5-star review for ${name} (${type}). Include phrasing like "${selectedPhrase}". Seed: ${randomSeed}`;
+
+  const t0 = Date.now();
+  try {
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      systemInstruction: systemInstruction,
+      generationConfig: { temperature: 1.0, topP: 0.95, topK: 40 }
+    });
+
+    const result = await model.generateContent(prompt);
+    let reviewText = result.response.text().trim().replace(/^["']|["']$/g, '');
+
+    res.json({
+      review: reviewText,
+      generated: true,
+      persona: selectedPersona,
+      latencyMs: Date.now() - t0,
+      wordCount: reviewText.split(/\s+/).length
+    });
+  } catch (err) {
+    console.error(`[AI Test Error] ${slug}:`, err.message);
+    res.status(500).json({ error: err.message, generated: false });
+  }
+});
+
+// ── ADMIN: Queue Inspector API ────────────────────────────────────────────────
+app.get('/admin/api/queue/:slug', adminAuth, (req, res) => {
+  const slug = sanitizeSlug(req.params.slug) || 'saloon';
+  const config = getBizConfig(slug) || {};
+  seedQueueIfEmpty(slug, config);
+  const q = reviewQueues[slug] || [];
+  res.json({
+    slug,
+    queueLength: q.length,
+    maxSize: MAX_QUEUE_SIZE,
+    items: q.map((item, idx) => ({
+      position: idx + 1,
+      review: item.review,
+      generated: item.generated,
+      source: item.source || 'queue',
+      meta: item.meta || {},
+      timestamp: item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : 'now'
+    }))
+  });
+});
+
 // ── ADMIN: Analytics API ───────────────────────────────────────────────────────
 app.get('/admin/api/analytics', adminAuth, (req, res) => {
   res.json({
@@ -290,6 +365,7 @@ app.get('/admin/api/analytics', adminAuth, (req, res) => {
     uniqueVisitors: analyticsStore.uniqueIps.size,
     deviceStats: analyticsStore.deviceStats,
     timeStats: analyticsStore.timeStats,
+    sourceStats: analyticsStore.sourceStats,
     logs: analyticsStore.logs
   });
 });
@@ -309,14 +385,7 @@ app.post('/admin/api/settings', adminAuth, (req, res) => {
   res.json({ success: true, note: 'Updated in-memory. Update env vars on Render to persist.' });
 });
 
-// ── ADMIN: Queue & status APIs ────────────────────────────────────────────────
-app.get('/admin/api/queue/:slug', adminAuth, (req, res) => {
-  const slug = sanitizeSlug(req.params.slug);
-  const q = reviewQueues[slug] || [];
-  res.json({ slug, queueLength: q.length, items: q });
-});
-
-// Returns list of all registered businesses including saloon (scanqr-beta.vercel.app)
+// ── ADMIN: Business APIs ───────────────────────────────────────────────────────
 app.get('/admin/api/businesses', adminAuth, (req, res) => {
   const slugs = new Set([
     ...Object.keys(DEFAULT_BUSINESSES),
@@ -388,5 +457,5 @@ app.get('/admin', (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v5.1 running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v6 (Queue Inspector + AI Review Tester + Analytics) running on port ${PORT}`);
 });

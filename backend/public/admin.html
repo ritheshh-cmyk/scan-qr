@@ -49,11 +49,7 @@
     text-align: center;
   }
 
-  .logo {
-    font-size: 2.4rem;
-    margin-bottom: 6px;
-  }
-
+  .logo { font-size: 2.4rem; margin-bottom: 6px; }
   .login-card h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; }
   .login-card p  { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
 
@@ -69,12 +65,7 @@
     transition: border 200ms;
   }
 
-  input:focus, textarea:focus, select:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-
-  textarea { resize: vertical; min-height: 90px; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 
   .btn {
     display: inline-flex;
@@ -149,7 +140,7 @@
 
   .content { padding: 28px; max-width: 1100px; margin: 0 auto; }
 
-  /* ── Cards ────────────────────────────────────── */
+  /* ── Cards & Grid ─────────────────────────────── */
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -167,7 +158,6 @@
 
   .card-header h3 { font-size: 1rem; font-weight: 600; }
 
-  /* ── Status badges ────────────────────────────── */
   .badge {
     display: inline-flex;
     align-items: center;
@@ -187,7 +177,6 @@
   .dot-up   { background: var(--up);   box-shadow: 0 0 6px var(--up);   }
   .dot-down { background: var(--down); box-shadow: 0 0 6px var(--down); }
 
-  /* ── Business grid ────────────────────────────── */
   .biz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
 
   .biz-card {
@@ -202,21 +191,19 @@
   .biz-slug { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
   .biz-actions { display: flex; gap: 8px; margin-top: 14px; }
 
-  /* ── Status table ─────────────────────────────── */
   .status-table { width: 100%; border-collapse: collapse; }
   .status-table th, .status-table td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
   .status-table th { color: var(--muted); font-weight: 500; }
   .status-table tr:last-child td { border-bottom: none; }
 
-  /* ── Settings form ────────────────────────────── */
   .settings-row { margin-bottom: 20px; }
   .settings-row label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 7px; font-weight: 500; }
 
-  /* ── Edit modal overlay ───────────────────────── */
+  /* ── Modal overlay ────────────────────────────── */
   .modal-overlay {
     display: none;
     position: fixed; inset: 0;
-    background: rgba(0,0,0,0.65);
+    background: rgba(0,0,0,0.68);
     z-index: 200;
     place-items: center;
   }
@@ -228,17 +215,14 @@
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 28px;
-    width: min(100% - 32px, 520px);
+    width: min(100% - 32px, 560px);
     max-height: 90vh;
     overflow-y: auto;
   }
 
-  .modal h3 { font-size: 1.05rem; margin-bottom: 20px; }
-  .modal .row { margin-bottom: 16px; }
-  .modal .row label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; }
+  .modal h3 { font-size: 1.05rem; margin-bottom: 16px; }
   .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 
-  /* ── Stats row ────────────────────────────────── */
   .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
   .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
   .stat-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; }
@@ -246,7 +230,6 @@
   .stat-value.up { color: var(--up); }
   .stat-value.accent { color: var(--accent); }
 
-  /* ── Toast ────────────────────────────────────── */
   #toast {
     position: fixed; bottom: 24px; right: 24px;
     background: var(--card); border: 1px solid var(--border);
@@ -258,20 +241,16 @@
   }
 
   #toast.show { transform: translateY(0); opacity: 1; }
-  #toast.success { border-color: var(--up);     color: var(--up);   }
-  #toast.error   { border-color: var(--danger);  color: var(--danger); }
+  #toast.success { border-color: var(--up); color: var(--up); }
+  #toast.error   { border-color: var(--danger); color: var(--danger); }
 
-  /* ── Add business form ────────────────────────── */
   .add-form { display: none; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin-bottom: 20px; }
   .add-form.open { display: block; }
   .add-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  @media (max-width: 600px) { .add-form-grid { grid-template-columns: 1fr; } }
 
-  .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; }
-  .empty { color: var(--muted); font-size: 0.88rem; padding: 32px 0; text-align: center; }
   .key-display { font-family: monospace; background: var(--bg); padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; color: var(--accent2); border: 1px solid var(--border); word-break: break-all; }
-
   #loadingSpinner { display: none; text-align: center; padding: 40px; color: var(--muted); }
+  .queue-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -299,6 +278,7 @@
 
   <div class="tabs">
     <div class="tab active" onclick="switchTab('status',this)" id="tab-status">📊 Status</div>
+    <div class="tab" onclick="switchTab('queue',this)" id="tab-queue">📥 FIFO Queue Inspector</div>
     <div class="tab" onclick="switchTab('analytics',this)" id="tab-analytics">📈 Analytics</div>
     <div class="tab" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
     <div class="tab" onclick="switchTab('settings',this)" id="tab-settings">⚙️ Settings</div>
@@ -327,6 +307,25 @@
           </thead>
           <tbody id="statusBody"></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ── QUEUE INSPECTOR tab ──────────────────────────────── -->
+    <div id="tab-content-queue" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <h3>📥 Live FIFO Queue Messages Inspector</h3>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <select id="queueSlugSelect" style="width:auto;padding:6px 12px;font-size:0.85rem;" onchange="loadQueueInspector()">
+              <option value="saloon">Business: saloon</option>
+              <option value="demo">Business: demo</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="loadQueueInspector()">↻ Refresh Queue</button>
+          </div>
+        </div>
+
+        <div id="queueStatsSummary" style="font-size:0.88rem;color:var(--muted);margin-bottom:16px">Loading queue items…</div>
+        <div id="queueItemsContainer"></div>
       </div>
     </div>
 
@@ -369,19 +368,17 @@
           <div class="row"><label>Business Name</label><input id="new-name" type="text" placeholder="e.g. Pink Salon"></div>
           <div class="row"><label>Business Type</label>
             <select id="new-type">
+              <option value="saloon">Saloon</option>
               <option value="salon">Salon</option>
               <option value="hair salon">Hair Salon</option>
               <option value="nail salon">Nail Salon</option>
               <option value="spa">Spa</option>
-              <option value="beauty parlour">Beauty Parlour</option>
               <option value="barbershop">Barbershop</option>
               <option value="restaurant">Restaurant</option>
-              <option value="cafe">Cafe</option>
-              <option value="other">Other</option>
             </select>
           </div>
           <div class="row"><label>Google Review Link</label><input id="new-google" type="url" placeholder="https://g.page/r/xxx/review"></div>
-          <div class="row"><label>Vercel Site URL</label><input id="new-siteUrl" type="url" placeholder="https://your-site.vercel.app"></div>
+          <div class="row"><label>Vercel Site URL</label><input id="new-siteUrl" type="url" placeholder="https://scanqr-beta.vercel.app"></div>
           <div class="row"><label>Override Gemini Key (optional)</label><input id="new-geminiKey" type="text" placeholder="Leave blank to use global key"></div>
         </div>
         <div style="display:flex;gap:10px;margin-top:14px">
@@ -408,52 +405,26 @@
           <input id="adminKeyInput" type="password" placeholder="Current key: Lucky@000">
         </div>
         <div style="font-size:0.78rem;color:var(--warn);margin-bottom:16px">
-          ⚠️ Saving here updates in-memory. Go to <strong>Render Dashboard → Environment</strong> to persist permanently.
+          ⚠️ Saving here updates in-memory. Go to <strong>Render Dashboard → Environment</strong> to persist changes permanently.
         </div>
         <button class="btn btn-success btn-sm" onclick="saveSettings()">Save Keys</button>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><h3>ℹ️ Quick Reference</h3></div>
-        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px">Add a new business by setting a Render env var:</p>
-        <div class="key-display">BIZ_yourslug = {"name":"Business Name","type":"salon","googleReviewLink":"https://...","siteUrl":"https://your-site.vercel.app"}</div>
-        <p style="font-size:0.82rem;color:var(--muted);margin-top:12px">Then deploy a new Vercel site with <code style="background:var(--bg);padding:2px 6px;border-radius:4px">BUSINESS_SLUG = 'yourslug'</code></p>
       </div>
     </div>
 
   </div><!-- /content -->
 </div><!-- /app -->
 
-<!-- ── Edit Modal ──────────────────────────────────────────────── -->
-<div class="modal-overlay" id="editModal" onclick="if(event.target===this)closeModal()">
+<!-- ── AI Review Test Modal ────────────────────────────────────── -->
+<div class="modal-overlay" id="aiTestModal" onclick="if(event.target===this)closeAiModal()">
   <div class="modal">
-    <h3>Edit Business</h3>
-    <input type="hidden" id="edit-slug">
-    <div class="row"><label>Business Name</label><input id="edit-name" type="text"></div>
-    <div class="row"><label>Business Type</label>
-      <select id="edit-type">
-        <option value="salon">Salon</option>
-        <option value="hair salon">Hair Salon</option>
-        <option value="nail salon">Nail Salon</option>
-        <option value="spa">Spa</option>
-        <option value="beauty parlour">Beauty Parlour</option>
-        <option value="barbershop">Barbershop</option>
-        <option value="restaurant">Restaurant</option>
-        <option value="cafe">Cafe</option>
-        <option value="other">Other</option>
-      </select>
-    </div>
-    <div class="row"><label>Google Review Link</label><input id="edit-google" type="url"></div>
-    <div class="row"><label>Vercel Site URL (for status checks)</label><input id="edit-siteUrl" type="url"></div>
-    <div class="row"><label>Override Gemini Key (leave blank to use global)</label><input id="edit-geminiKey" type="text"></div>
+    <h3>⚡ Live Gemini AI Review Test Result</h3>
+    <div id="aiModalContent">Generating live AI review…</div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeAiModal()">Close</button>
     </div>
   </div>
 </div>
 
-<!-- ── Toast ───────────────────────────────────────────────────── -->
 <div id="toast"></div>
 
 <script>
@@ -472,6 +443,7 @@
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         loadStatus();
+        loadQueueInspector();
         loadAnalytics();
         loadBusinesses();
         loadSettings();
@@ -517,10 +489,11 @@
   function switchTab(name, el) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
-    ['status','analytics','businesses','settings'].forEach(t => {
+    ['status','queue','analytics','businesses','settings'].forEach(t => {
       document.getElementById(`tab-content-${t}`).style.display = t === name ? '' : 'none';
     });
     if (name === 'status')      loadStatus();
+    if (name === 'queue')       loadQueueInspector();
     if (name === 'analytics')   loadAnalytics();
     if (name === 'businesses')  loadBusinesses();
     if (name === 'settings')    loadSettings();
@@ -566,6 +539,37 @@
     document.getElementById('loadingSpinner').style.display = 'none';
   }
 
+  // ── QUEUE INSPECTOR tab ─────────────────────────────────────────────────────
+  async function loadQueueInspector() {
+    const slug = document.getElementById('queueSlugSelect').value;
+    const container = document.getElementById('queueItemsContainer');
+    container.innerHTML = '<div class="empty">Loading active queue buffer…</div>';
+
+    try {
+      const data = await apiJSON(`/admin/api/queue/${slug}`);
+
+      document.getElementById('queueStatsSummary').textContent =
+        `Active Queue Buffer: ${data.queueLength} / ${data.maxSize} items ready for instant 0ms pop`;
+
+      if (!data.items.length) {
+        container.innerHTML = '<div class="empty">Queue is empty right now.</div>';
+        return;
+      }
+
+      container.innerHTML = data.items.map(item => `
+        <div class="queue-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span class="badge ${item.generated ? 'badge-ai' : 'badge-up'}">Position #${item.position} · ${item.source}</span>
+            <span style="font-size:0.75rem;color:var(--muted)">Added: ${item.timestamp}</span>
+          </div>
+          <div style="font-size:0.92rem;line-height:1.5;">"${item.review}"</div>
+        </div>
+      `).join('');
+    } catch (err) {
+      container.innerHTML = `<div class="empty">Error loading queue: ${err.message}</div>`;
+    }
+  }
+
   // ── ANALYTICS tab ──────────────────────────────────────────────────────────
   async function loadAnalytics() {
     try {
@@ -580,7 +584,7 @@
         <div class="stat-card"><div class="stat-label">Total Scans</div><div class="stat-value accent">${data.totalScans}</div></div>
         <div class="stat-card"><div class="stat-label">Unique Visitors</div><div class="stat-value up">${data.uniqueVisitors}</div></div>
         <div class="stat-card"><div class="stat-label">Mobile Traffic</div><div class="stat-value accent">${mobilePct}%</div></div>
-        <div class="stat-card"><div class="stat-label">Log Entries</div><div class="stat-value up">${data.logs.length}</div></div>
+        <div class="stat-card"><div class="stat-label">Scan Log Entries</div><div class="stat-value up">${data.logs.length}</div></div>
       `;
 
       const tbody = document.getElementById('analyticsLogBody');
@@ -628,7 +632,7 @@
           <div class="biz-card-header">
             <div>
               <div class="biz-name">${b.name || b.slug}</div>
-              <div class="biz-slug">slug: ${b.slug} · ${b.type || 'salon'}</div>
+              <div class="biz-slug">slug: ${b.slug} · ${b.type || 'saloon'}</div>
             </div>
             <span class="badge badge-ai">⚡ AI</span>
           </div>
@@ -636,7 +640,7 @@
           ${b.siteUrl ? `<div style="font-size:0.78rem;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🌐 <a href="${b.siteUrl}" target="_blank" style="color:inherit">${b.siteUrl}</a></div>` : ''}
           <div class="biz-actions">
             <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(b)})'>✏️ Edit</button>
-            <button class="btn btn-success btn-sm" onclick="testReview('${b.slug}')">Test AI Review</button>
+            <button class="btn btn-success btn-sm" onclick="testReview('${b.slug}')">⚡ Test Gemini AI</button>
           </div>
         </div>
       `).join('');
@@ -646,8 +650,7 @@
   }
 
   function toggleAddForm() {
-    const f = document.getElementById('addForm');
-    f.classList.toggle('open');
+    document.getElementById('addForm').classList.toggle('open');
   }
 
   async function addBusiness() {
@@ -672,10 +675,55 @@
     }
   }
 
+  // ── Direct Gemini AI Review Tester Modal ────────────────────────────────────
+  async function testReview(slug) {
+    document.getElementById('aiTestModal').classList.add('open');
+    document.getElementById('aiModalContent').innerHTML = `
+      <div style="text-align:center;padding:20px;color:var(--muted);">
+        ⚡ Calling Gemini 1.5-flash AI for business "<strong>${slug}</strong>"…
+      </div>
+    `;
+
+    try {
+      const r = await api(`/admin/api/test-ai/${slug}`, { method: 'POST' });
+      const data = await r.json();
+
+      if (r.ok && data.generated) {
+        document.getElementById('aiModalContent').innerHTML = `
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;">
+            <div style="font-size:1.02rem;line-height:1.55;color:var(--text);margin-bottom:14px;">"${data.review}"</div>
+            <div style="display:flex;gap:12px;font-size:0.8rem;color:var(--muted);border-top:1px solid var(--border);padding-top:12px;">
+              <span>⚡ Latency: <strong>${data.latencyMs}ms</strong></span>
+              <span>📝 Length: <strong>${data.wordCount} words</strong></span>
+              <span>🎭 Persona: <strong>${data.persona.split(':')[0]}</strong></span>
+            </div>
+          </div>
+          <div style="font-size:0.82rem;color:var(--up);">✅ Gemini AI generation successful! Review ready.</div>
+        `;
+      } else {
+        document.getElementById('aiModalContent').innerHTML = `
+          <div style="color:var(--danger);font-size:0.9rem;">
+            ❌ Gemini AI Error: ${data.error || 'Failed to generate review. Check Gemini API key in Settings.'}
+          </div>
+        `;
+      }
+    } catch (err) {
+      document.getElementById('aiModalContent').innerHTML = `
+        <div style="color:var(--danger);font-size:0.9rem;">
+          ❌ Network Error: ${err.message}
+        </div>
+      `;
+    }
+  }
+
+  function closeAiModal() {
+    document.getElementById('aiTestModal').classList.remove('open');
+  }
+
   function openEdit(b) {
     document.getElementById('edit-slug').value      = b.slug;
     document.getElementById('edit-name').value      = b.name || '';
-    document.getElementById('edit-type').value      = b.type || 'salon';
+    document.getElementById('edit-type').value      = b.type || 'saloon';
     document.getElementById('edit-google').value    = b.googleReviewLink || '';
     document.getElementById('edit-siteUrl').value   = b.siteUrl || '';
     document.getElementById('edit-geminiKey').value = b.geminiApiKey || '';
@@ -700,16 +748,6 @@
       loadBusinesses();
     } else {
       toast('Failed to save', 'error');
-    }
-  }
-
-  async function testReview(slug) {
-    toast('Generating AI review…', 'success');
-    const r = await apiJSON(`/api/review/${slug}`);
-    if (r.generated) {
-      alert(`AI Review for "${slug}":\n\n"${r.review}"`);
-    } else {
-      alert(`Error: ${r.error}`);
     }
   }
 
