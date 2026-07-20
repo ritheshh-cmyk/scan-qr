@@ -320,7 +320,7 @@
       return active ? active.dataset.value : '';
     }
 
-    // ── GENERATE REVIEW (AI backend with fallback) ──────────────────────────────
+    // ── GENERATE REVIEW (Fast FIFO Backend Queue with Dynamic Fallback) ───────
     async function generateReview() {
       rateBtn.disabled         = true;
       btnText.style.display    = 'none';
@@ -333,32 +333,30 @@
       let review      = null;
       let aiGenerated = false;
 
-      // 1. If backend is online, try AI review generation with user data
-      if (backendOnline) {
-        try {
-          const ctrl = new AbortController();
-          const t    = setTimeout(() => ctrl.abort(), 4500); // 4.5s max
+      // Fast fetch from FIFO queue backend (returns < 50ms when warm)
+      try {
+        const ctrl = new AbortController();
+        const t    = setTimeout(() => ctrl.abort(), 2200); // 2.2s timeout max
 
-          const url = new URL(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}`);
-          if (service)   url.searchParams.append('service', service);
-          if (vibe)      url.searchParams.append('vibe', vibe);
-          if (staffName) url.searchParams.append('staffName', staffName);
+        const url = new URL(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}`);
+        if (service)   url.searchParams.append('service', service);
+        if (vibe)      url.searchParams.append('vibe', vibe);
+        if (staffName) url.searchParams.append('staffName', staffName);
 
-          const r = await fetch(url.toString(), { signal: ctrl.signal });
-          clearTimeout(t);
-          if (r.ok) {
-            const data = await r.json();
-            if (data.generated && data.review) {
-              review      = data.review;
-              aiGenerated = true;
-            }
+        const r = await fetch(url.toString(), { signal: ctrl.signal });
+        clearTimeout(t);
+        if (r.ok) {
+          const data = await r.json();
+          if (data.review) {
+            review      = data.review;
+            aiGenerated = data.generated !== false;
           }
-        } catch {
-          backendOnline = false;
         }
+      } catch {
+        /* backend offline / spinning up — fallback to dynamic generator */
       }
 
-      // 2. If AI didn't return (offline/timeout), generate dynamic unique fallback review
+      // If backend didn't respond in < 2.2s, use local dynamic review generator instantly
       if (!review) {
         review      = getDynamicFallbackReview(service, staffName, vibe);
         aiGenerated = false;
