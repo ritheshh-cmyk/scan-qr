@@ -7,7 +7,7 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
-app.set('trust proxy', true); // get real client IP behind Render/Vercel proxies
+app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -15,30 +15,44 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── FIFO Review Queue Storage (max 10 items per slug) ─────────────────────────
 const MAX_QUEUE_SIZE = 10;
 const reviewQueues   = {}; // { slug: [{ review: string, meta: object, timestamp: number }] }
+const recentReviews  = {}; // track recent reviews to avoid duplicates
 
-// Seed default reviews for a slug into the queue if empty
+// ── Human Writing Personas & Style Tricks for Realism ─────────────────────────
+const PERSONAS = [
+  "Casual & Quick: Short 2-sentence review, super casual tone, maybe start with lowercase word, fast reader vibe.",
+  "Enthusiastic & Warm: Happy customer who loves the atmosphere and friendly staff, genuine excitement.",
+  "Direct & Practical: Focus on speed, cleanliness, fair pricing, and getting exactly what was asked for.",
+  "Walk-in Recommendation: Focus on being pleasantly surprised, great attention to detail, highly recommending to friends.",
+  "Minimalist 5-Star: Very short, punchy (25-35 words), straightforward customer voice."
+];
+
+const CASUAL_PHRASES = [
+  "honestly", "super happy", "10/10", "hands down", "definitely coming back",
+  "so glad I came here", "left feeling great", "fresh and clean", "spot on"
+];
+
+// Seed initial natural reviews into queue if empty
 function seedQueueIfEmpty(slug, config) {
-  if (!reviewQueues[slug]) {
-    reviewQueues[slug] = [];
-  }
+  if (!reviewQueues[slug]) reviewQueues[slug] = [];
+
   if (reviewQueues[slug].length === 0) {
     const name = config.name || 'Our Salon';
-    const initialReviews = [
-      `Honestly loved my visit to ${name}! The staff were so friendly, clean environment, and great service overall. Will definitely be coming back.`,
-      `Great experience at ${name}. Super professional stylists, lovely atmosphere, and left feeling very satisfied with my appointment!`
+    const initialSeedReviews = [
+      `honestly so happy with my visit to ${name}! staff were super friendly, clean place, and service was 10/10. definitely coming back.`,
+      `Great experience at ${name}. Walked in and was greeted warmly right away. Very skilled team and relaxing vibe. Highly recommend!`,
+      `Best salon visit I've had in a while. Spotless clean, fair prices, and my stylist did an awesome job. Will be back for sure!`
     ];
-    initialReviews.forEach(rev => {
+    initialSeedReviews.forEach(rev => {
       reviewQueues[slug].push({
         review: rev,
         generated: false,
-        source: 'initial-seed',
+        source: 'initial-human-seed',
         timestamp: Date.now()
       });
     });
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
 function sanitizeSlug(s) {
   return s ? s.toLowerCase().replace(/[^a-z0-9_]/g, '') : '';
 }
@@ -60,24 +74,21 @@ function adminAuth(req, res, next) {
 function getClientMetadata(req) {
   const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
   const ip = rawIp.split(',')[0].trim();
-  const userAgent = req.headers['user-agent'] || 'Unknown Device';
+  const userAgent = req.headers['user-agent'] || 'Mobile Browser';
   const lang = req.headers['accept-language'] || 'en-US';
 
-  // Device type estimation
   const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent);
-  const deviceType = isMobile ? 'Mobile Phone' : 'Desktop/Tablet';
+  const deviceType = isMobile ? 'Smartphone' : 'Desktop';
 
-  // Time of day context
   const hour = new Date().getHours();
-  let timeOfDay = 'Daytime';
+  let timeOfDay = 'Afternoon';
   if (hour < 12) timeOfDay = 'Morning';
-  else if (hour < 17) timeOfDay = 'Afternoon';
-  else timeOfDay = 'Evening';
+  else if (hour >= 18) timeOfDay = 'Evening';
 
-  return { ip, userAgent, deviceType, lang, timeOfDay };
+  return { ip, userAgent, deviceType, lang, timeOfDay, timestamp: Date.now() };
 }
 
-// ── Background Worker: Generate new AI review & push to FIFO Queue ──────────────
+// ── Background Worker: Generate new AI review with Maximum Entropy & Human Tone ─
 async function generateAndEnqueueReview(slug, meta, customInput = {}) {
   const config = getBizConfig(slug) || {};
   const geminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
@@ -87,51 +98,77 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
   const type = config.type || 'salon';
   const name = config.name || 'the salon';
 
+  // Pick random persona & casual phrase seed for maximum entropy
+  const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
+  const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
+  const randomSeed      = `${Date.now()}_${Math.floor(Math.random() * 999999)}_${meta.ip}`;
+
   const systemInstruction =
-    `You are a genuine customer writing a quick, authentic Google review for "${name}", a ${type}.\n` +
-    `RULES FOR NATURAL HUMAN TONE:\n` +
-    `1. Write in a relaxed, casual, realistic human tone. Avoid sounding like marketing or AI.\n` +
-    `2. Keep length concise (30 to 50 words).\n` +
-    `3. Every output MUST be completely distinct in phrasing, vocabulary, and structure.\n` +
-    `4. Output ONLY the raw review text without any surrounding quotes, tags, or labels.`;
+    `You are a real everyday person writing a quick 5-star Google review for "${name}", a ${type}.\n` +
+    `CRITICAL INSTRUCTIONS FOR REALISTIC HUMAN TONE:\n` +
+    `1. NEVER sound like an AI, marketing brochure, or corporate copywriter.\n` +
+    `2. Style direction: ${selectedPersona}\n` +
+    `3. Write between 25 and 45 words. Keep it short and natural.\n` +
+    `4. Output ONLY the plain text of the review. No quotes, no preamble, no hashtags, no title.`;
 
-  let prompt = `Write a unique positive 5-star Google review for ${name} (${type}).`;
-  if (customInput.service)   prompt += ` Service: ${customInput.service}.`;
-  if (customInput.staffName) prompt += ` Stylist/Staff: ${customInput.staffName}.`;
-  if (customInput.vibe)      prompt += ` Atmosphere: ${customInput.vibe}.`;
+  let prompt = `Write a completely unique, natural 5-star review for ${name} (${type}).\n`;
+  if (customInput.service)   prompt += `Service: ${customInput.service}.\n`;
+  if (customInput.staffName) prompt += `Stylist/Staff: ${customInput.staffName}.\n`;
+  if (customInput.vibe)      prompt += `Atmosphere: ${customInput.vibe}.\n`;
 
-  // Include non-identifying environment hints to diversify AI output
-  prompt += ` Context hints: Written on a ${meta.deviceType} during ${meta.timeOfDay}. Seed: ${Date.now()}_${Math.random()}`;
+  prompt += `Include a natural casual touch using phrasing like "${selectedPhrase}".\n`;
+  prompt += `Entropy Seed: ${randomSeed}`;
 
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({
       model: 'gemini-1.5-flash',
-      systemInstruction: systemInstruction
+      systemInstruction: systemInstruction,
+      generationConfig: {
+        temperature: 1.0, // Maximum randomness & creative diversity
+        topP: 0.95,
+        topK: 40
+      }
     });
 
     const result = await model.generateContent(prompt);
-    const reviewText = result.response.text().trim();
+    let reviewText = result.response.text().trim();
+
+    // Remove quotes if model wrapped output in quotes
+    reviewText = reviewText.replace(/^["']|["']$/g, '');
 
     if (!reviewQueues[slug]) reviewQueues[slug] = [];
+    if (!recentReviews[slug]) recentReviews[slug] = new Set();
+
+    // Simple deduplication check
+    if (recentReviews[slug].has(reviewText)) {
+      console.log(`[Queue] Duplicate review generated for ${slug}, skipping.`);
+      return;
+    }
+
+    recentReviews[slug].add(reviewText);
+    if (recentReviews[slug].size > 50) {
+      const firstItem = recentReviews[slug].values().next().value;
+      recentReviews[slug].delete(firstItem);
+    }
 
     // Push new review into FIFO queue
     reviewQueues[slug].push({
       review: reviewText,
       generated: true,
-      source: 'gemini-ai',
-      meta: { deviceType: meta.deviceType, timeOfDay: meta.timeOfDay },
+      source: 'gemini-high-entropy',
+      meta: { deviceType: meta.deviceType, persona: selectedPersona },
       timestamp: Date.now()
     });
 
-    // Keep FIFO Queue bounded to MAX_QUEUE_SIZE (10 items) — old items automatically cycle out
+    // Bounded FIFO Queue max 10
     while (reviewQueues[slug].length > MAX_QUEUE_SIZE) {
-      reviewQueues[slug].shift(); // remove oldest item from start of queue
+      reviewQueues[slug].shift();
     }
 
-    console.log(`[Queue] Added AI review for ${slug}. Current queue length: ${reviewQueues[slug].length}`);
+    console.log(`[Queue] Enqueued human-like review for ${slug} (${reviewQueues[slug].length}/${MAX_QUEUE_SIZE})`);
   } catch (err) {
-    console.error(`[Queue Error] Failed to generate AI review for ${slug}:`, err.message);
+    console.error(`[Queue Error] ${slug}:`, err.message);
   }
 }
 
@@ -146,55 +183,47 @@ app.get('/api/config/:slug', (req, res) => {
   const config = getBizConfig(slug);
   if (!config) return res.status(404).json({ error: `No config found for slug: ${slug}` });
 
-  // Ensure queue is seeded
   seedQueueIfEmpty(slug, config);
-
   res.json(config);
 });
 
-// ── FAST FIFO QUEUE REVIEW ENDPOINT (< 50ms Response) ──────────────────────────
+// ── FAST FIFO QUEUE REVIEW ENDPOINT (< 50ms) ──────────────────────────────────
 async function handleReviewRequest(req, res) {
   const slug   = sanitizeSlug(req.params.slug);
   const config = getBizConfig(slug) || {};
   const clientMeta = getClientMetadata(req);
 
-  // Seed queue if empty
   seedQueueIfEmpty(slug, config);
 
   const customInput = {
     service:   req.query.service || req.body?.service || '',
     staffName: req.query.staffName || req.body?.staffName || '',
-    vibe:      req.query.vibe || req.body?.vibe || '',
-    customNote:req.query.customNote || req.body?.customNote || ''
+    vibe:      req.query.vibe || req.body?.vibe || ''
   };
 
   const queue = reviewQueues[slug] || [];
-
   let reviewObj = null;
 
-  // 1. Instantly pop a pre-generated review from the FIFO Queue if available
+  // 1. Instantly pop pre-generated review from FIFO Queue
   if (queue.length > 0) {
-    reviewObj = queue.shift(); // FIFO pop
+    reviewObj = queue.shift();
   }
 
-  // 2. Trigger background worker to generate the NEXT AI review using client metadata
-  // This runs asynchronously so the user gets instant response!
+  // 2. Trigger asynchronous background AI generator to replenish queue with new unique review
   setImmediate(() => {
     generateAndEnqueueReview(slug, clientMeta, customInput);
   });
 
-  // If queue was empty (rare), fallback immediately
   if (!reviewObj) {
     const name = config.name || 'Our Salon';
     reviewObj = {
-      review: `Had a great experience at ${name}! The team was professional, welcoming, and delivered excellent results. Highly recommend!`,
+      review: `honestly loved my visit to ${name}! clean place, friendly staff, and great service. 10/10 recommend.`,
       generated: false,
-      source: 'instant-fallback',
+      source: 'instant-human-fallback',
       timestamp: Date.now()
     };
   }
 
-  // Return review instantly (< 50ms)
   res.json({
     review: reviewObj.review,
     generated: reviewObj.generated,
@@ -206,14 +235,13 @@ async function handleReviewRequest(req, res) {
 app.get('/api/review/:slug', handleReviewRequest);
 app.post('/api/review/:slug', handleReviewRequest);
 
-// ── ADMIN: View current FIFO Queue status ──────────────────────────────────────
+// ── ADMIN: Queue & status APIs ────────────────────────────────────────────────
 app.get('/admin/api/queue/:slug', adminAuth, (req, res) => {
   const slug = sanitizeSlug(req.params.slug);
   const q = reviewQueues[slug] || [];
   res.json({ slug, queueLength: q.length, items: q });
 });
 
-// ── ADMIN: list all businesses ─────────────────────────────────────────────────
 app.get('/admin/api/businesses', adminAuth, (req, res) => {
   const list = Object.keys(process.env)
     .filter(k => k.startsWith('BIZ_'))
@@ -225,29 +253,22 @@ app.get('/admin/api/businesses', adminAuth, (req, res) => {
   res.json(list);
 });
 
-// ── ADMIN: update a business config ───────────────────────────────────────────
 app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
   const slug = sanitizeSlug(req.params.slug);
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(400).json({ error: 'Empty body' });
   }
   process.env[`BIZ_${slug}`] = JSON.stringify(req.body);
-  res.json({
-    success: true,
-    note: `In-memory updated. Update BIZ_${slug} in Render env vars to persist permanently.`,
-    config: req.body
-  });
+  res.json({ success: true, config: req.body });
 });
 
-// ── ADMIN: update global settings ─────────────────────────────────────────────
 app.post('/admin/api/settings', adminAuth, (req, res) => {
   const { geminiApiKey, adminApiKey } = req.body;
   if (geminiApiKey) process.env.GEMINI_API_KEY = geminiApiKey;
   if (adminApiKey)  process.env.ADMIN_API_KEY  = adminApiKey;
-  res.json({ success: true, note: 'Updated in-memory. Update env vars on Render to persist.' });
+  res.json({ success: true });
 });
 
-// ── ADMIN: check status ────────────────────────────────────────────────────────
 app.get('/admin/api/status', adminAuth, async (req, res) => {
   const bizKeys = Object.keys(process.env).filter(k => k.startsWith('BIZ_'));
   const checks  = [];
@@ -287,12 +308,11 @@ app.get('/admin/api/status', adminAuth, async (req, res) => {
   });
 });
 
-// ── ADMIN: serve admin panel HTML ──────────────────────────────────────────────
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v3 (FIFO Queue + Client Meta + Human Tone) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v4 (High-Entropy Human Realism Engine) running on port ${PORT}`);
 });
