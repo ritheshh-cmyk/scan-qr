@@ -25,6 +25,32 @@ const DEFAULT_BUSINESSES = {
   }
 };
 
+// Candidate Gemini models to handle API version changes seamlessly
+const MODEL_CANDIDATES = [
+  'gemini-2.0-flash',
+  'gemini-1.5-flash-latest',
+  'gemini-1.5-pro-latest',
+  'gemini-1.5-flash',
+  'gemini-pro'
+];
+
+async function generateWithFallbackModel(genAI, fullPrompt) {
+  let lastErr = null;
+  for (const modelName of MODEL_CANDIDATES) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(fullPrompt);
+      const text = result.response.text().trim().replace(/^["']|["']$/g, '');
+      if (text) {
+        return { text, modelUsed: modelName };
+      }
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('All Gemini model candidates failed');
+}
+
 // ── Middleware ─────────────────────────────────────────────────────────────────
 app.set('trust proxy', true);
 app.use(cors());
@@ -169,11 +195,7 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
 
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    const result = await model.generateContent(fullPrompt);
-    let reviewText = result.response.text().trim();
-    reviewText = reviewText.replace(/^["']|["']$/g, '');
+    const { text: reviewText, modelUsed } = await generateWithFallbackModel(genAI, fullPrompt);
 
     if (!reviewQueues[slug]) reviewQueues[slug] = [];
     if (!recentReviews[slug]) recentReviews[slug] = new Set();
@@ -191,8 +213,8 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
     reviewQueues[slug].push({
       review: reviewText,
       generated: true,
-      source: 'gemini-high-entropy',
-      meta: { deviceType: meta.deviceType, persona: selectedPersona },
+      source: `gemini-high-entropy (${modelUsed})`,
+      meta: { deviceType: meta.deviceType, persona: selectedPersona, modelUsed },
       timestamp: Date.now()
     });
 
@@ -293,15 +315,13 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
   const t0 = Date.now();
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    const result = await model.generateContent(fullPrompt);
-    let reviewText = result.response.text().trim().replace(/^["']|["']$/g, '');
+    const { text: reviewText, modelUsed } = await generateWithFallbackModel(genAI, fullPrompt);
 
     res.json({
       review: reviewText,
       generated: true,
       persona: selectedPersona,
+      modelUsed,
       latencyMs: Date.now() - t0,
       wordCount: reviewText.split(/\s+/).length
     });
@@ -431,5 +451,5 @@ app.get('/admin', (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v6.1 running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v6.2 (Multi-Model Fallback) running on port ${PORT}`);
 });
