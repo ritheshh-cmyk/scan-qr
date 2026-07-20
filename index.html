@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Restaurant Feedback</title>
+  <style>
+    :root {
+      --tomato: #c7432d;
+      --tomato-dark: #9f2f20;
+      --leaf: #446b3c;
+      --cream: #fff8ee;
+      --paper: #fffdf8;
+      --ink: #2d241d;
+      --muted: #6d5c4e;
+      --ring: rgba(199, 67, 45, 0.22);
+      --shadow: 0 18px 45px rgba(89, 49, 25, 0.14);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(255, 188, 122, 0.32), transparent 32rem),
+        linear-gradient(145deg, #fff3df 0%, #fff8ee 48%, #f3ead7 100%);
+      display: grid;
+      place-items: center;
+      padding: 22px;
+    }
+
+    main {
+      width: min(100%, 440px);
+      background: var(--paper);
+      border: 1px solid rgba(141, 92, 52, 0.16);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 28px 22px;
+    }
+
+    .kicker {
+      margin: 0 0 12px;
+      color: var(--leaf);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.75rem, 8vw, 2.35rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .subtext {
+      margin: 14px 0 24px;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    button {
+      width: 100%;
+      min-height: 54px;
+      border: 0;
+      border-radius: 8px;
+      font: inherit;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+      touch-action: manipulation;
+    }
+
+    button:focus-visible,
+    textarea:focus-visible {
+      outline: 4px solid var(--ring);
+      outline-offset: 3px;
+    }
+
+    button:active { transform: translateY(1px); }
+
+    .primary {
+      color: #fff;
+      background: var(--tomato);
+      box-shadow: 0 10px 22px rgba(199, 67, 45, 0.25);
+    }
+
+    .primary:hover { background: var(--tomato-dark); }
+    .primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+    .secondary {
+      margin-top: 14px;
+      color: #fff;
+      background: var(--leaf);
+      box-shadow: 0 10px 22px rgba(68, 107, 60, 0.22);
+    }
+
+    .secondary:hover { background: #365830; }
+
+    .review-area {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .review-area.is-visible { display: block; }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 132px;
+      resize: vertical;
+      border: 1px solid rgba(109, 92, 78, 0.28);
+      border-radius: 8px;
+      background: #fffaf1;
+      color: var(--ink);
+      padding: 14px;
+      font: inherit;
+      font-size: 1rem;
+      line-height: 1.45;
+    }
+
+    .status {
+      min-height: 22px;
+      margin: 10px 0 0;
+      color: var(--leaf);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .loading-dot {
+      display: inline-block;
+      animation: blink 1.2s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
+
+    @media (min-width: 560px) {
+      main { padding: 34px 32px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="kicker">Quick feedback</p>
+    <h1 id="heading">Loading<span class="loading-dot">…</span></h1>
+    <p class="subtext">Tap once, copy your review, and share it on Google.</p>
+
+    <button class="primary" id="rateButton" type="button" disabled>Rate Us</button>
+
+    <section class="review-area" id="reviewArea" aria-live="polite">
+      <label for="reviewText">Your review</label>
+      <textarea id="reviewText"></textarea>
+      <button class="secondary" id="copyButton" type="button">Copy Review &amp; Open Google</button>
+      <p class="status" id="statusMessage" role="status"></p>
+    </section>
+  </main>
+
+  <script>
+    // ── CONFIG ── change these two lines per business deployment ─────────────────
+    const BUSINESS_SLUG = 'demo';
+    const BACKEND_URL   = 'https://scan-qr-backend.onrender.com';
+
+    // ── FALLBACK (used if backend is unreachable) ─────────────────────────────────
+    const FALLBACK = {
+      name: 'Our Restaurant',
+      googleReviewLink: 'https://search.google.com/local/writereview',
+      reviews: [
+        'Amazing taste, friendly service, and a cozy ambience. Everything felt fresh and worth the price.',
+        'Delicious food, quick service, and lovely ambience. Fresh ingredients made the meal excellent value.',
+        'Great flavours, warm staff, and relaxing ambience. The food tasted fresh and prices felt fair.',
+        'Loved the fresh food, attentive service, and welcoming ambience. A tasty meal with great value.',
+        'Excellent taste, clean presentation, and kind service. Fresh dishes made the visit memorable.'
+      ]
+    };
+
+    // ── STATE ────────────────────────────────────────────────────────────────────
+    let config = null;
+    let lastReviewIndex = -1;
+
+    const heading       = document.getElementById('heading');
+    const rateButton    = document.getElementById('rateButton');
+    const reviewArea    = document.getElementById('reviewArea');
+    const reviewText    = document.getElementById('reviewText');
+    const copyButton    = document.getElementById('copyButton');
+    const statusMessage = document.getElementById('statusMessage');
+
+    // ── LOAD CONFIG FROM BACKEND ──────────────────────────────────────────────────
+    async function loadConfig() {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        config = await res.json();
+      } catch (err) {
+        console.warn('Backend unreachable, using fallback config.', err.message);
+        config = FALLBACK;
+      }
+      heading.textContent = `How was your experience at ${config.name}?`;
+      rateButton.disabled = false;
+    }
+
+    // ── HELPERS ──────────────────────────────────────────────────────────────────
+    function getRandomReview() {
+      const reviews = config.reviews || FALLBACK.reviews;
+      let idx = Math.floor(Math.random() * reviews.length);
+      while (reviews.length > 1 && idx === lastReviewIndex) {
+        idx = Math.floor(Math.random() * reviews.length);
+      }
+      lastReviewIndex = idx;
+      return reviews[idx];
+    }
+
+    async function copyReview() {
+      const text = reviewText.value.trim();
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        reviewText.select();
+        document.execCommand('copy');
+      }
+      statusMessage.textContent = 'Review copied. Opening Google…';
+      window.open(config.googleReviewLink || FALLBACK.googleReviewLink, '_blank', 'noopener,noreferrer');
+    }
+
+    // ── EVENTS ───────────────────────────────────────────────────────────────────
+    rateButton.addEventListener('click', () => {
+      reviewText.value = getRandomReview();
+      reviewArea.classList.add('is-visible');
+      reviewText.focus();
+    });
+
+    copyButton.addEventListener('click', copyReview);
+
+    // ── BOOT ─────────────────────────────────────────────────────────────────────
+    loadConfig();
+  </script>
+</body>
+</html>
