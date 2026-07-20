@@ -25,10 +25,10 @@ const DEFAULT_BUSINESSES = {
   }
 };
 
-// Candidate Gemini models ordered by priority
+// Candidate Gemini models ordered by performance & availability
 const MODEL_CANDIDATES = [
-  'gemini-2.5-flash',
   'gemini-2.0-flash',
+  'gemini-1.5-flash-8b',
   'gemini-1.5-flash-latest',
   'gemini-1.5-pro-latest',
   'gemini-1.5-flash',
@@ -47,9 +47,12 @@ async function generateWithFallbackModel(genAI, fullPrompt) {
       }
     } catch (err) {
       lastErr = err;
-      // If error is permission denied or key invalid, don't keep looping models
-      if (err.message && (err.message.includes('PERMISSION_DENIED') || err.message.includes('denied access') || err.message.includes('API_KEY_INVALID'))) {
-        throw new Error('Gemini API Key is Invalid or Permission Denied by Google Cloud. Please update your Gemini API Key in Settings.');
+      const msg = err.message || '';
+      if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('Quota exceeded') || msg.includes('429')) {
+        throw new Error('Gemini API Quota Exceeded (Google Free Tier 15 req/min limit). Please wait 30 seconds.');
+      }
+      if (msg.includes('PERMISSION_DENIED') || msg.includes('denied access') || msg.includes('API_KEY_INVALID')) {
+        throw new Error('Gemini API Key Access Denied by Google Cloud. Please check your key in Settings.');
       }
     }
   }
@@ -457,5 +460,5 @@ app.get('/admin', (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v6.3 (Clear Error Diagnostics) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v6.4 running on port ${PORT}`);
 });
