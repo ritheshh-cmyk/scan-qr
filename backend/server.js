@@ -71,7 +71,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── FIFO Review Queue Storage (max 10 items per slug) ─────────────────────────
+// ── FIFO Review Queue Storage (Strictly Isolated Per Business Slug) ────────────
 const MAX_QUEUE_SIZE = 10;
 const reviewQueues   = {}; 
 const recentReviews  = {}; 
@@ -129,30 +129,67 @@ const CASUAL_PHRASES = [
   "so glad I found this place", "left feeling great", "fresh and clean", "spot on", "worth every penny"
 ];
 
-function seedQueueIfEmpty(slug, config) {
-  if (!reviewQueues[slug]) reviewQueues[slug] = [];
+function sanitizeSlug(s) {
+  return s ? s.toLowerCase().replace(/[^a-z0-9_]/g, '') : '';
+}
 
-  if (reviewQueues[slug].length === 0) {
-    const name = config.name || slug;
-    const type = config.type || 'store';
+function getBizConfig(slug) {
+  const cleanSlug = sanitizeSlug(slug);
+  const raw = process.env[`BIZ_${cleanSlug}`];
+  if (raw) {
+    try { return JSON.parse(raw); } catch {}
+  }
+  if (DEFAULT_BUSINESSES[cleanSlug]) {
+    return DEFAULT_BUSINESSES[cleanSlug];
+  }
+
+  // DYNAMIC SLUG FALLBACK: Infer name & type from slug so custom business NEVER fails or defaults to Saloon!
+  const formattedName = cleanSlug.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  let inferredType = 'store';
+  if (cleanSlug.includes('fashion') || cleanSlug.includes('clothing') || cleanSlug.includes('wear')) inferredType = 'clothing store';
+  else if (cleanSlug.includes('saloon') || cleanSlug.includes('salon') || cleanSlug.includes('hair')) inferredType = 'saloon';
+  else if (cleanSlug.includes('barber')) inferredType = 'barbershop';
+  else if (cleanSlug.includes('food') || cleanSlug.includes('restaurant')) inferredType = 'restaurant';
+  else if (cleanSlug.includes('cafe')) inferredType = 'cafe';
+
+  return {
+    name: formattedName,
+    type: inferredType,
+    googleReviewLink: `https://search.google.com/local/writereview?placeid=${cleanSlug}`,
+    siteUrl: `https://scanqr-beta.vercel.app?biz=${cleanSlug}`
+  };
+}
+
+function seedQueueIfEmpty(slug, config) {
+  const cleanSlug = sanitizeSlug(slug);
+  if (!reviewQueues[cleanSlug]) reviewQueues[cleanSlug] = [];
+
+  if (reviewQueues[cleanSlug].length === 0) {
+    const cfg  = config || getBizConfig(cleanSlug);
+    const name = cfg.name || cleanSlug;
+    const type = (cfg.type || 'store').toLowerCase();
     
     let initialSeedReviews = [];
-    if (type.includes('clothing') || type.includes('fashion') || type.includes('boutique')) {
+    if (type.includes('clothing') || type.includes('fashion') || type.includes('boutique') || cleanSlug.includes('fashion') || cleanSlug.includes('wear')) {
       initialSeedReviews = [
         `honestly so happy with my shopping at ${name}! great clothing collection, fitting was spot on, and staff were super helpful 10/10.`,
         `Loved my visit to ${name}. Beautiful clothes, awesome quality, and fair prices. Definitely coming back for more outfits!`,
-        `Best fashion store in town! Spotless clean shop, friendly team, and got exactly what I was looking for. 5 stars!`
+        `Best fashion store in town! Spotless clean shop, friendly team, and got exactly what I was looking for. 5 stars!`,
+        `Walked into ${name} today and found the perfect outfits. Great style variety, comfortable fabric, and top tier service.`,
+        `Super clean boutique atmosphere at ${name}. Staff helped me find my size right away. Highly recommend!`
       ];
     } else {
       initialSeedReviews = [
         `honestly so happy with my visit to ${name}! staff were super friendly, clean place, and service was 10/10. definitely coming back.`,
         `Great experience at ${name}. Walked in and was greeted warmly right away. Very skilled team and relaxing vibe. Highly recommend!`,
-        `Best visit I've had in a while. Spotless clean, fair prices, and the team did an awesome job. Will be back for sure!`
+        `Best visit I've had in a while. Spotless clean, fair prices, and the team did an awesome job. Will be back for sure!`,
+        `Walked into ${name} today and left super satisfied. Excellent attention to detail, peaceful environment, and great value.`,
+        `Top tier service at ${name} from start to finish. Friendly staff, cozy atmosphere, and 100% worth every penny.`
       ];
     }
 
     initialSeedReviews.forEach(rev => {
-      reviewQueues[slug].push({
+      reviewQueues[cleanSlug].push({
         review: rev,
         generated: false,
         source: 'initial-human-seed',
@@ -160,18 +197,6 @@ function seedQueueIfEmpty(slug, config) {
       });
     });
   }
-}
-
-function sanitizeSlug(s) {
-  return s ? s.toLowerCase().replace(/[^a-z0-9_]/g, '') : '';
-}
-
-function getBizConfig(slug) {
-  const raw = process.env[`BIZ_${slug}`];
-  if (raw) {
-    try { return JSON.parse(raw); } catch {}
-  }
-  return DEFAULT_BUSINESSES[slug] || null;
 }
 
 function adminAuth(req, res, next) {
@@ -201,13 +226,14 @@ function getClientMetadata(req) {
 
 // ── Background Worker: Generate new AI review with High Entropy ────────────────
 async function generateAndEnqueueReview(slug, meta, customInput = {}) {
-  const config = getBizConfig(slug) || {};
+  const cleanSlug = sanitizeSlug(slug);
+  const config    = getBizConfig(cleanSlug);
   const geminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
 
   if (!geminiKey) return;
 
   const type = config.type || 'business';
-  const name = config.name || slug;
+  const name = config.name || cleanSlug;
 
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
@@ -217,26 +243,26 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
     `Style persona: ${selectedPersona}\n` +
     `Include a natural casual phrase like "${selectedPhrase}".\n` +
-    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus on realistic details for a ${type}. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
+    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). Do not mention any other business. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
 
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
     const { text: reviewText, modelUsed } = await generateWithFallbackModel(genAI, fullPrompt);
 
-    if (!reviewQueues[slug]) reviewQueues[slug] = [];
-    if (!recentReviews[slug]) recentReviews[slug] = new Set();
+    if (!reviewQueues[cleanSlug]) reviewQueues[cleanSlug] = [];
+    if (!recentReviews[cleanSlug]) recentReviews[cleanSlug] = new Set();
 
-    if (recentReviews[slug].has(reviewText)) {
+    if (recentReviews[cleanSlug].has(reviewText)) {
       return;
     }
 
-    recentReviews[slug].add(reviewText);
-    if (recentReviews[slug].size > 50) {
-      const firstItem = recentReviews[slug].values().next().value;
-      recentReviews[slug].delete(firstItem);
+    recentReviews[cleanSlug].add(reviewText);
+    if (recentReviews[cleanSlug].size > 50) {
+      const firstItem = recentReviews[cleanSlug].values().next().value;
+      recentReviews[cleanSlug].delete(firstItem);
     }
 
-    reviewQueues[slug].push({
+    reviewQueues[cleanSlug].push({
       review: reviewText,
       generated: true,
       source: `gemini-high-entropy (${modelUsed})`,
@@ -244,11 +270,11 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
       timestamp: Date.now()
     });
 
-    while (reviewQueues[slug].length > MAX_QUEUE_SIZE) {
-      reviewQueues[slug].shift();
+    while (reviewQueues[cleanSlug].length > MAX_QUEUE_SIZE) {
+      reviewQueues[cleanSlug].shift();
     }
   } catch (err) {
-    console.error(`[Queue Error] ${slug}:`, err.message);
+    console.error(`[Queue Error] ${cleanSlug}:`, err.message);
   }
 }
 
@@ -259,21 +285,20 @@ app.get('/health', (req, res) => {
 
 // ── GET config for a slug ──────────────────────────────────────────────────────
 app.get('/api/config/:slug', (req, res) => {
-  const slug   = sanitizeSlug(req.params.slug);
-  const config = getBizConfig(slug);
-  if (!config) return res.status(404).json({ error: `No config found for slug: ${slug}` });
+  const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
+  const config    = getBizConfig(cleanSlug);
 
-  seedQueueIfEmpty(slug, config);
+  seedQueueIfEmpty(cleanSlug, config);
   res.json(config);
 });
 
 // ── FAST FIFO QUEUE REVIEW ENDPOINT (< 50ms) ──────────────────────────────────
 async function handleReviewRequest(req, res) {
-  const slug   = sanitizeSlug(req.params.slug) || 'saloon';
-  const config = getBizConfig(slug) || DEFAULT_BUSINESSES.saloon;
+  const cleanSlug  = sanitizeSlug(req.params.slug) || 'saloon';
+  const config     = getBizConfig(cleanSlug);
   const clientMeta = getClientMetadata(req);
 
-  seedQueueIfEmpty(slug, config);
+  seedQueueIfEmpty(cleanSlug, config);
 
   const customInput = {
     service:   req.query.service || req.body?.service || '',
@@ -281,30 +306,42 @@ async function handleReviewRequest(req, res) {
     vibe:      req.query.vibe || req.body?.vibe || ''
   };
 
-  const queue = reviewQueues[slug] || [];
+  const queue = reviewQueues[cleanSlug] || [];
   let reviewObj = null;
 
   if (queue.length > 0) {
     reviewObj = queue.shift();
   }
 
-  recordScanEvent(slug, clientMeta, reviewObj ? (reviewObj.generated ? 'Gemini AI Queue' : 'Initial Seed Queue') : 'Instant Fallback');
-
-  setImmediate(() => {
-    generateAndEnqueueReview(slug, clientMeta, customInput);
-  });
+  // CONTINUOUS QUEUE REPLENISHMENT: If queue length drops below 5, generate new AI reviews immediately!
+  if (queue.length < 5) {
+    setImmediate(() => {
+      generateAndEnqueueReview(cleanSlug, clientMeta, customInput);
+    });
+  }
 
   if (!reviewObj) {
-    const name = config.name || 'Our Store';
+    const name = config.name || cleanSlug;
+    const type = (config.type || 'store').toLowerCase();
+    
+    let fallbackText = `honestly loved my visit to ${name}! clean place, friendly staff, and great quality. 10/10 recommend.`;
+    if (type.includes('clothing') || type.includes('fashion') || type.includes('boutique') || cleanSlug.includes('fashion') || cleanSlug.includes('wear')) {
+      fallbackText = `honestly so happy with my shopping at ${name}! great clothing collection, fitting was spot on, and staff were super helpful 10/10.`;
+    }
+
     reviewObj = {
-      review: `honestly loved my visit to ${name}! clean place, friendly staff, and great quality. 10/10 recommend.`,
+      review: fallbackText,
       generated: false,
       source: 'instant-human-fallback',
       timestamp: Date.now()
     };
   }
 
+  recordScanEvent(cleanSlug, clientMeta, reviewObj.source);
+
   res.json({
+    slug: cleanSlug,
+    businessName: config.name,
     review: reviewObj.review,
     generated: reviewObj.generated,
     queueRemaining: queue.length,
@@ -317,8 +354,8 @@ app.post('/api/review/:slug', handleReviewRequest);
 
 // ── ADMIN: Direct AI Review Tester ─────────────────────────────────────────────
 app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
-  const slug   = sanitizeSlug(req.params.slug) || 'saloon';
-  const config = getBizConfig(slug) || DEFAULT_BUSINESSES.saloon;
+  const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
+  const config    = getBizConfig(cleanSlug);
   const geminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
 
   if (!geminiKey) {
@@ -326,7 +363,7 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
   }
 
   const type = config.type || 'business';
-  const name = config.name || slug;
+  const name = config.name || cleanSlug;
 
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
@@ -336,7 +373,7 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
     `Style persona: ${selectedPersona}\n` +
     `Include a natural casual phrase like "${selectedPhrase}".\n` +
-    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus on realistic details for a ${type}. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
+    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). Do not mention any other business. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
 
   const t0 = Date.now();
   try {
@@ -352,7 +389,7 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
       wordCount: reviewText.split(/\s+/).length
     });
   } catch (err) {
-    console.error(`[AI Test Error] ${slug}:`, err.message);
+    console.error(`[AI Test Error] ${cleanSlug}:`, err.message);
     const msg = err.message || 'Gemini API call failed';
     res.status(500).json({ error: msg, generated: false });
   }
@@ -360,12 +397,12 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
 
 // ── ADMIN: Queue Inspector API ────────────────────────────────────────────────
 app.get('/admin/api/queue/:slug', adminAuth, (req, res) => {
-  const slug = sanitizeSlug(req.params.slug) || 'saloon';
-  const config = getBizConfig(slug) || {};
-  seedQueueIfEmpty(slug, config);
-  const q = reviewQueues[slug] || [];
+  const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
+  const config    = getBizConfig(cleanSlug);
+  seedQueueIfEmpty(cleanSlug, config);
+  const q = reviewQueues[cleanSlug] || [];
   res.json({
-    slug,
+    slug: cleanSlug,
     queueLength: q.length,
     maxSize: MAX_QUEUE_SIZE,
     items: q.map((item, idx) => ({
@@ -422,17 +459,20 @@ app.get('/admin/api/businesses', adminAuth, (req, res) => {
 });
 
 app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
-  const slug = sanitizeSlug(req.params.slug);
+  const cleanSlug = sanitizeSlug(req.params.slug);
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(400).json({ error: 'Empty body' });
   }
 
-  // Auto-fill siteUrl if not provided
   if (!req.body.siteUrl) {
-    req.body.siteUrl = `https://scanqr-beta.vercel.app?biz=${slug}`;
+    req.body.siteUrl = `https://scanqr-beta.vercel.app?biz=${cleanSlug}`;
   }
 
-  process.env[`BIZ_${slug}`] = JSON.stringify(req.body);
+  process.env[`BIZ_${cleanSlug}`] = JSON.stringify(req.body);
+  
+  // Re-seed queue for newly added business immediately
+  seedQueueIfEmpty(cleanSlug, req.body);
+
   res.json({ success: true, config: req.body });
 });
 
@@ -482,7 +522,12 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
+// ── INITIALIZE QUEUES ON STARTUP ───────────────────────────────────────────────
+Object.keys(DEFAULT_BUSINESSES).forEach(slug => {
+  seedQueueIfEmpty(slug, DEFAULT_BUSINESSES[slug]);
+});
+
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v8.0 (Universal Multi-Business Engine) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v9.0 (Strict Isolated Queues & Continuous Replenishment) running on port ${PORT}`);
 });
