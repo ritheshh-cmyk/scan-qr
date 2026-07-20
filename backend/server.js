@@ -121,11 +121,11 @@ const PERSONAS = [
   "Enthusiastic & Detailed: Happy customer praising the friendly staff, clean aesthetic, and great products/service.",
   "Walk-in Direct: Focus on unexpected quick availability, fair pricing, awesome quality, great result.",
   "Cozy Vibe: Focus on peaceful atmosphere, great smell, attentive staff, leaving super satisfied.",
-  "Minimalist 5-Star: 20 to 30 words, punchy, honest, 10/10 recommendation."
+  "Minimalist 5-Star: 20 to 30 words, punchy, honest, top tier recommendation."
 ];
 
 const CASUAL_PHRASES = [
-  "honestly", "super happy", "10/10", "hands down", "definitely coming back",
+  "honestly", "super happy", "really impressed", "hands down", "definitely coming back",
   "so glad I found this place", "left feeling great", "fresh and clean", "spot on", "worth every penny"
 ];
 
@@ -172,15 +172,15 @@ function seedQueueIfEmpty(slug, config) {
     let initialSeedReviews = [];
     if (type.includes('clothing') || type.includes('fashion') || type.includes('boutique') || cleanSlug.includes('fashion') || cleanSlug.includes('wear')) {
       initialSeedReviews = [
-        `honestly so happy with my shopping at ${name}! great clothing collection, fitting was spot on, and staff were super helpful 10/10.`,
+        `honestly so happy with my shopping at ${name}! great clothing collection, fitting was spot on, and staff were super helpful.`,
         `Loved my visit to ${name}. Beautiful clothes, awesome quality, and fair prices. Definitely coming back for more outfits!`,
-        `Best fashion store in town! Spotless clean shop, friendly team, and got exactly what I was looking for. 5 stars!`,
+        `Best fashion store in town! Spotless clean shop, friendly team, and got exactly what I was looking for. Highly recommend!`,
         `Walked into ${name} today and found the perfect outfits. Great style variety, comfortable fabric, and top tier service.`,
-        `Super clean boutique atmosphere at ${name}. Staff helped me find my size right away. Highly recommend!`
+        `Super clean boutique atmosphere at ${name}. Staff helped me find my size right away. Really impressed!`
       ];
     } else {
       initialSeedReviews = [
-        `honestly so happy with my visit to ${name}! staff were super friendly, clean place, and service was 10/10. definitely coming back.`,
+        `honestly so happy with my visit to ${name}! staff were super friendly, clean place, and service was top quality. definitely coming back.`,
         `Great experience at ${name}. Walked in and was greeted warmly right away. Very skilled team and relaxing vibe. Highly recommend!`,
         `Best visit I've had in a while. Spotless clean, fair prices, and the team did an awesome job. Will be back for sure!`,
         `Walked into ${name} today and left super satisfied. Excellent attention to detail, peaceful environment, and great value.`,
@@ -243,7 +243,7 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
     `Style persona: ${selectedPersona}\n` +
     `Include a natural casual phrase like "${selectedPhrase}".\n` +
-    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). Do not mention any other business. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
+    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). DO NOT use cliché phrases like '10/10' or '5 stars'. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
 
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
@@ -324,9 +324,9 @@ async function handleReviewRequest(req, res) {
     const name = config.name || cleanSlug;
     const type = (config.type || 'store').toLowerCase();
     
-    let fallbackText = `honestly loved my visit to ${name}! clean place, friendly staff, and great quality. 10/10 recommend.`;
+    let fallbackText = `honestly loved my visit to ${name}! clean place, friendly staff, and great quality. Highly recommend.`;
     if (type.includes('clothing') || type.includes('fashion') || type.includes('boutique') || cleanSlug.includes('fashion') || cleanSlug.includes('wear')) {
-      fallbackText = `honestly so happy with my shopping at ${name}! great clothing collection, fitting was spot on, and staff were super helpful 10/10.`;
+      fallbackText = `honestly so happy with my shopping at ${name}! great clothing collection, fitting was spot on, and staff were super helpful.`;
     }
 
     reviewObj = {
@@ -373,7 +373,7 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
     `Style persona: ${selectedPersona}\n` +
     `Include a natural casual phrase like "${selectedPhrase}".\n` +
-    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). Do not mention any other business. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
+    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). DO NOT use cliché phrases like '10/10' or '5 stars'. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
 
   const t0 = Date.now();
   try {
@@ -529,5 +529,5 @@ Object.keys(DEFAULT_BUSINESSES).forEach(slug => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v9.0 (Strict Isolated Queues & Continuous Replenishment) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v9.1 (No Repetitive 10/10) running on port ${PORT}`);
 });
