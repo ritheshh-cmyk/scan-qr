@@ -25,8 +25,9 @@ const DEFAULT_BUSINESSES = {
   }
 };
 
-// Candidate Gemini models to handle API version changes seamlessly
+// Candidate Gemini models ordered by priority
 const MODEL_CANDIDATES = [
+  'gemini-2.5-flash',
   'gemini-2.0-flash',
   'gemini-1.5-flash-latest',
   'gemini-1.5-pro-latest',
@@ -46,6 +47,10 @@ async function generateWithFallbackModel(genAI, fullPrompt) {
       }
     } catch (err) {
       lastErr = err;
+      // If error is permission denied or key invalid, don't keep looping models
+      if (err.message && (err.message.includes('PERMISSION_DENIED') || err.message.includes('denied access') || err.message.includes('API_KEY_INVALID'))) {
+        throw new Error('Gemini API Key is Invalid or Permission Denied by Google Cloud. Please update your Gemini API Key in Settings.');
+      }
     }
   }
   throw lastErr || new Error('All Gemini model candidates failed');
@@ -296,7 +301,7 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
   const geminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
 
   if (!geminiKey) {
-    return res.status(503).json({ error: 'Gemini API key not configured on backend', generated: false });
+    return res.status(503).json({ error: 'Gemini API Key is missing. Enter a valid key in Settings tab.', generated: false });
   }
 
   const type = config.type || 'saloon';
@@ -327,7 +332,8 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
     });
   } catch (err) {
     console.error(`[AI Test Error] ${slug}:`, err.message);
-    res.status(500).json({ error: err.message, generated: false });
+    const msg = err.message || 'Gemini API call failed';
+    res.status(500).json({ error: msg, generated: false });
   }
 });
 
@@ -451,5 +457,5 @@ app.get('/admin', (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v6.2 (Multi-Model Fallback) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v6.3 (Clear Error Diagnostics) running on port ${PORT}`);
 });
