@@ -13,7 +13,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function sanitizeSlug(s) {
-  return s.toLowerCase().replace(/[^a-z0-9_]/g, '');
+  return s ? s.toLowerCase().replace(/[^a-z0-9_]/g, '') : '';
 }
 
 function getBizConfig(slug) {
@@ -43,31 +43,49 @@ app.get('/api/config/:slug', (req, res) => {
   res.json(config);
 });
 
-// ── GET AI-generated review for a slug ────────────────────────────────────────
-// Returns { review, generated: true } on success
-// Returns 503 with { error } if no API key or Gemini fails
-app.get('/api/review/:slug', async (req, res) => {
+// ── GET / POST AI-generated review for a slug ────────────────────────────────
+async function handleReviewRequest(req, res) {
   const slug   = sanitizeSlug(req.params.slug);
   const config = getBizConfig(slug) || {};
 
-  // Per-business key overrides global key
   const geminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
 
   if (!geminiKey) {
     return res.status(503).json({ error: 'Gemini API key not configured', generated: false });
   }
 
-  const type = config.type || 'salon';
-  const name = config.name || 'the salon';
+  const type       = config.type || 'salon';
+  const name       = config.name || 'the salon';
 
-  const prompt =
-    `Write a short, genuine-sounding positive Google review for "${name}", a ${type}. ` +
-    `Mention specific details: staff skill, cleanliness, atmosphere, value for money, overall experience. ` +
-    `Keep it between 40–65 words. Return ONLY the review text — no quotes, no labels, no extra lines.`;
+  // Extract user parameters (from query params or body)
+  const service    = req.query.service || req.body?.service || '';
+  const staffName  = req.query.staffName || req.body?.staffName || '';
+  const vibe       = req.query.vibe || req.body?.vibe || '';
+  const customNote = req.query.customNote || req.body?.customNote || '';
+
+  const systemInstruction =
+    `You are a helpful customer assistant for "${name}", a premier ${type}. ` +
+    `Generate a short, authentic, 5-star Google review written from a customer's personal perspective. ` +
+    `RULES:\n` +
+    `1. Keep length between 35 and 60 words.\n` +
+    `2. Write in a natural, genuine tone. Never use cliché marketing hype.\n` +
+    `3. Every output MUST be completely unique in phrasing and structure.\n` +
+    `4. Return ONLY the review text. No quotes, no prefix, no markdown tags.`;
+
+  let prompt = `Write a unique 5-star Google review for ${name} (${type}).`;
+  if (service)    prompt += ` Service done: ${service}.`;
+  if (staffName)  prompt += ` Staff/Stylist name: ${staffName}.`;
+  if (vibe)       prompt += ` Vibe/Highlight: ${vibe}.`;
+  if (customNote) prompt += ` Customer note: ${customNote}.`;
+  prompt += ` (Randomization seed: ${Date.now()}_${Math.random()})`;
 
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      systemInstruction: systemInstruction
+    });
+
     const result = await model.generateContent(prompt);
     const review = result.response.text().trim();
     res.json({ review, generated: true });
@@ -75,7 +93,10 @@ app.get('/api/review/:slug', async (req, res) => {
     console.error('Gemini error:', err.message);
     res.status(500).json({ error: 'Failed to generate review', details: err.message, generated: false });
   }
-});
+}
+
+app.get('/api/review/:slug', handleReviewRequest);
+app.post('/api/review/:slug', handleReviewRequest);
 
 // ── ADMIN: list all businesses ─────────────────────────────────────────────────
 app.get('/admin/api/businesses', adminAuth, (req, res) => {
@@ -89,7 +110,7 @@ app.get('/admin/api/businesses', adminAuth, (req, res) => {
   res.json(list);
 });
 
-// ── ADMIN: update a business config (in-process; update Render env to persist) ─
+// ── ADMIN: update a business config ───────────────────────────────────────────
 app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
   const slug = sanitizeSlug(req.params.slug);
   if (!req.body || Object.keys(req.body).length === 0) {
@@ -98,12 +119,12 @@ app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
   process.env[`BIZ_${slug}`] = JSON.stringify(req.body);
   res.json({
     success: true,
-    note: `In-memory updated. Go to Render dashboard → Environment and update BIZ_${slug} to persist permanently.`,
+    note: `In-memory updated. Update BIZ_${slug} in Render env vars to persist permanently.`,
     config: req.body
   });
 });
 
-// ── ADMIN: update global settings (Gemini key, admin key) in-process ──────────
+// ── ADMIN: update global settings ─────────────────────────────────────────────
 app.post('/admin/api/settings', adminAuth, (req, res) => {
   const { geminiApiKey, adminApiKey } = req.body;
   if (geminiApiKey) process.env.GEMINI_API_KEY = geminiApiKey;
@@ -111,7 +132,7 @@ app.post('/admin/api/settings', adminAuth, (req, res) => {
   res.json({ success: true, note: 'Updated in-memory. Update env vars on Render to persist.' });
 });
 
-// ── ADMIN: check status of all registered sites + backend ─────────────────────
+// ── ADMIN: check status ────────────────────────────────────────────────────────
 app.get('/admin/api/status', adminAuth, async (req, res) => {
   const bizKeys = Object.keys(process.env).filter(k => k.startsWith('BIZ_'));
   const checks  = [];
@@ -127,7 +148,7 @@ app.get('/admin/api/status', adminAuth, async (req, res) => {
     }
 
     try {
-      const t0  = Date.now();
+      const t0   = Date.now();
       const res2 = await fetch(url, { signal: AbortSignal.timeout(6000) });
       checks.push({
         slug,
@@ -157,5 +178,5 @@ app.get('/admin', (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v2 running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v2.1 running on port ${PORT}`);
 });
