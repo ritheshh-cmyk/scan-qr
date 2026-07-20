@@ -6,8 +6,24 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// Default admin key fallback updated to Lucky@000
+// Default admin key fallback
 const DEFAULT_ADMIN_KEY = process.env.ADMIN_API_KEY || 'Lucky@000';
+
+// Built-in registered businesses with Vercel frontend site URL
+const DEFAULT_BUSINESSES = {
+  saloon: {
+    name: "Royal Saloon & Spa",
+    type: "saloon",
+    googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_SALOON_PLACE_ID",
+    siteUrl: "https://scanqr-beta.vercel.app"
+  },
+  demo: {
+    name: "Demo Beauty Salon",
+    type: "salon",
+    googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_DEMO_PLACE_ID",
+    siteUrl: "https://scanqr-beta.vercel.app"
+  }
+};
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
 app.set('trust proxy', true);
@@ -43,7 +59,7 @@ function recordScanEvent(slug, meta, reviewSource) {
     id: Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
     timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    slug: slug || 'demo',
+    slug: slug || 'saloon',
     ip: meta.ip || '127.0.0.1',
     deviceType: device,
     timeOfDay: tod,
@@ -73,11 +89,11 @@ function seedQueueIfEmpty(slug, config) {
   if (!reviewQueues[slug]) reviewQueues[slug] = [];
 
   if (reviewQueues[slug].length === 0) {
-    const name = config.name || 'Our Salon';
+    const name = config.name || 'Royal Saloon & Spa';
     const initialSeedReviews = [
       `honestly so happy with my visit to ${name}! staff were super friendly, clean place, and service was 10/10. definitely coming back.`,
       `Great experience at ${name}. Walked in and was greeted warmly right away. Very skilled team and relaxing vibe. Highly recommend!`,
-      `Best salon visit I've had in a while. Spotless clean, fair prices, and my stylist did an awesome job. Will be back for sure!`
+      `Best saloon visit I've had in a while. Spotless clean, fair prices, and my stylist did an awesome job. Will be back for sure!`
     ];
     initialSeedReviews.forEach(rev => {
       reviewQueues[slug].push({
@@ -96,8 +112,10 @@ function sanitizeSlug(s) {
 
 function getBizConfig(slug) {
   const raw = process.env[`BIZ_${slug}`];
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch { return null; }
+  if (raw) {
+    try { return JSON.parse(raw); } catch {}
+  }
+  return DEFAULT_BUSINESSES[slug] || null;
 }
 
 function adminAuth(req, res, next) {
@@ -132,8 +150,8 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
 
   if (!geminiKey) return;
 
-  const type = config.type || 'salon';
-  const name = config.name || 'the salon';
+  const type = config.type || 'saloon';
+  const name = config.name || 'Royal Saloon & Spa';
 
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
@@ -217,8 +235,8 @@ app.get('/api/config/:slug', (req, res) => {
 
 // ── FAST FIFO QUEUE REVIEW ENDPOINT (< 50ms) ──────────────────────────────────
 async function handleReviewRequest(req, res) {
-  const slug   = sanitizeSlug(req.params.slug);
-  const config = getBizConfig(slug) || {};
+  const slug   = sanitizeSlug(req.params.slug) || 'saloon';
+  const config = getBizConfig(slug) || DEFAULT_BUSINESSES.saloon;
   const clientMeta = getClientMetadata(req);
 
   seedQueueIfEmpty(slug, config);
@@ -245,7 +263,7 @@ async function handleReviewRequest(req, res) {
   });
 
   if (!reviewObj) {
-    const name = config.name || 'Our Salon';
+    const name = config.name || 'Royal Saloon & Spa';
     reviewObj = {
       review: `honestly loved my visit to ${name}! clean place, friendly staff, and great service. 10/10 recommend.`,
       generated: false,
@@ -276,7 +294,7 @@ app.get('/admin/api/analytics', adminAuth, (req, res) => {
   });
 });
 
-// ── ADMIN: Settings API (returns current Gemini key for display in Admin panel) ──
+// ── ADMIN: Settings API ────────────────────────────────────────────────────────
 app.get('/admin/api/settings', adminAuth, (req, res) => {
   res.json({
     geminiApiKey: process.env.GEMINI_API_KEY || '',
@@ -298,14 +316,18 @@ app.get('/admin/api/queue/:slug', adminAuth, (req, res) => {
   res.json({ slug, queueLength: q.length, items: q });
 });
 
+// Returns list of all registered businesses including saloon (scanqr-beta.vercel.app)
 app.get('/admin/api/businesses', adminAuth, (req, res) => {
-  const list = Object.keys(process.env)
-    .filter(k => k.startsWith('BIZ_'))
-    .map(k => {
-      const slug = k.replace('BIZ_', '').toLowerCase();
-      const cfg  = getBizConfig(slug);
-      return { slug, ...(cfg || { error: 'Invalid JSON' }) };
-    });
+  const slugs = new Set([
+    ...Object.keys(DEFAULT_BUSINESSES),
+    ...Object.keys(process.env).filter(k => k.startsWith('BIZ_')).map(k => k.replace('BIZ_', '').toLowerCase())
+  ]);
+
+  const list = Array.from(slugs).map(slug => {
+    const cfg = getBizConfig(slug);
+    return { slug, ...(cfg || {}) };
+  });
+
   res.json(list);
 });
 
@@ -319,11 +341,14 @@ app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
 });
 
 app.get('/admin/api/status', adminAuth, async (req, res) => {
-  const bizKeys = Object.keys(process.env).filter(k => k.startsWith('BIZ_'));
-  const checks  = [];
+  const slugs = new Set([
+    ...Object.keys(DEFAULT_BUSINESSES),
+    ...Object.keys(process.env).filter(k => k.startsWith('BIZ_')).map(k => k.replace('BIZ_', '').toLowerCase())
+  ]);
 
-  for (const key of bizKeys) {
-    const slug   = key.replace('BIZ_', '').toLowerCase();
+  const checks = [];
+
+  for (const slug of slugs) {
     const config = getBizConfig(slug) || {};
     const url    = config.siteUrl;
 
@@ -363,5 +388,5 @@ app.get('/admin', (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v4.2 (Analytics + Gemini Key Display + Lucky@000 Auth) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v5.1 running on port ${PORT}`);
 });
