@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Redirecting to Google Reviews…</title>
+  <title>Opening Google Reviews…</title>
   <style>
     :root {
       --rose:       #c0395c;
@@ -75,8 +75,8 @@
 </head>
 <body onclick="handleTap()">
   <main>
-    <div class="icon">🚀</div>
-    <h1>Opening Google Reviews…</h1>
+    <div class="icon">💇‍♀️</div>
+    <h1 id="heading">Opening Saloon Google Reviews…</h1>
     <p class="subtext">Review copied! Redirecting automatically.</p>
 
     <button class="btn-tap" id="mainBtn" type="button">
@@ -85,36 +85,37 @@
   </main>
 
   <script>
-    // ── CONFIG ──────────────────────────────────────────────────────────────────
-    const BUSINESS_SLUG      = 'demo';
-    const BACKEND_URL        = 'https://scan-qr-backend.onrender.com';
+    // ── MULTI-BUSINESS CONFIG & SLUG DETECTION ─────────────────────────────────
+    const urlParams    = new URLSearchParams(window.location.search);
+    const BUSINESS_SLUG = urlParams.get('biz') || urlParams.get('slug') || urlParams.get('business') || 'saloon';
+    const BACKEND_URL   = 'https://scan-qr-backend.onrender.com';
     
-    // PLACEHOLDER GOOGLE REVIEW LINK (update with your Google place ID link)
-    const GOOGLE_REVIEW_LINK = 'https://search.google.com/local/writereview?placeid=YOUR_PLACE_ID_HERE';
+    // DEFAULT PLACEHOLDER GOOGLE REVIEW LINK (update or set in Admin Panel)
+    let googleReviewLink = 'https://search.google.com/local/writereview?placeid=YOUR_SALOON_PLACE_ID';
 
-    // ── COMBINATORIAL DYNAMIC REVIEW GENERATOR (100+ Unique Permutations Instantly) ──
+    // ── COMBINATORIAL DYNAMIC REVIEW GENERATOR (175+ Unique Permutations Instantly) ──
     const OPENINGS = [
-      'honestly so happy with my visit!',
-      'Great experience here.',
-      'Best salon visit I\'ve had in a long time.',
-      'Super clean space and welcoming energy.',
-      'Top tier service from start to finish!',
-      'Walked in today and left feeling refreshed.',
-      'Loved my appointment here today.'
+      'honestly so happy with my saloon visit!',
+      'Great experience at this saloon.',
+      'Best haircut and saloon visit I\'ve had in a long time.',
+      'Super clean saloon space and welcoming energy.',
+      'Top tier saloon service from start to finish!',
+      'Walked in today and left feeling fresh & handsome.',
+      'Loved my hair appointment here today.'
     ];
     const MIDDLES = [
       'Staff were super friendly and listened to exactly what I wanted.',
-      'Spotless clean, relaxing atmosphere, and very skilled team.',
-      'Quick in and out, pricing is super fair, and quality is 10/10.',
-      'Attention to detail was amazing and the environment is so cozy.',
-      'Warm hospitality, great expertise, and awesome work.'
+      'Spotless clean, relaxing atmosphere, and very skilled stylists.',
+      'Quick in and out, pricing is super fair, and service quality is 10/10.',
+      'Attention to detail was amazing and the environment is so comfortable.',
+      'Warm hospitality, great expertise, and awesome haircut.'
     ];
     const CLOSINGS = [
       'Definitely coming back!',
-      'Highly recommend to anyone.',
+      'Highly recommend this saloon to everyone.',
       'Will be back for sure!',
       '5 stars hands down.',
-      'My new go-to place!'
+      'My new favorite saloon!'
     ];
 
     function generateUniqueReview() {
@@ -125,8 +126,6 @@
     }
 
     let redirected = false;
-
-    // Generate unique review instantly
     const selectedReview = generateUniqueReview();
 
     // ── COPY CLIPBOARD (Instant) ────────────────────────────────────────────────
@@ -143,28 +142,44 @@
       }
     }
 
-    // ── INSTANT REDIRECT FUNCTION ──────────────────────────────────────────────
+    // ── INSTANT REDIRECT FUNCTION (0ms wait) ──────────────────────────────────
     function doRedirect() {
       if (redirected) return;
       redirected = true;
 
       copyInstantly(selectedReview);
 
-      // Non-blocking background telemetry send (0ms impact on redirect speed!)
+      // Non-blocking background telemetry send with specific business slug
       if (navigator.sendBeacon) {
         navigator.sendBeacon(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}?service=scan`);
       }
 
-      // Instant redirect (0ms wait)
-      window.location.href = GOOGLE_REVIEW_LINK;
+      // Instant redirect
+      window.location.href = googleReviewLink;
     }
 
     function handleTap() {
       doRedirect();
     }
 
+    // ── BACKGROUND FETCH: Load custom business config (name & Google Link) ──────
+    function loadBusinessConfig() {
+      fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(cfg => {
+          if (cfg && cfg.googleReviewLink) {
+            googleReviewLink = cfg.googleReviewLink;
+          }
+          if (cfg && cfg.name) {
+            document.getElementById('heading').textContent = `Opening ${cfg.name} Reviews…`;
+          }
+        })
+        .catch(() => {});
+    }
+
     // ── EXECUTE IMMEDIATELY ON SCRIPT LOAD (0.01 SECONDS SPEED!) ────────────────
     copyInstantly(selectedReview);
+    loadBusinessConfig();
     
     // Fire redirect instantly
     setTimeout(doRedirect, 50);
