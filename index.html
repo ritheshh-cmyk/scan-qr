@@ -92,19 +92,42 @@
     // PLACEHOLDER GOOGLE REVIEW LINK (update with your Google place ID link)
     const GOOGLE_REVIEW_LINK = 'https://search.google.com/local/writereview?placeid=YOUR_PLACE_ID_HERE';
 
-    // ── DYNAMIC REVIEWS POOL (Serves 0ms local speed with human tone diversity) ──
-    const REVIEWS_POOL = [
-      'honestly so happy with my visit! staff were super friendly, clean place, and service was 10/10. definitely coming back.',
-      'Great experience. Walked in and was greeted warmly right away. Very skilled team and relaxing vibe. Highly recommend!',
-      'Best salon visit I\'ve had in a while. Spotless clean, fair prices, and my stylist did an awesome job. Will be back for sure!',
-      'Super clean space, welcoming energy, and they listened to exactly what I wanted. Left feeling great. 5 stars!',
-      'Top tier service! Really friendly team, cozy atmosphere, and super happy with the results. Definitely my new go-to place.'
+    // ── COMBINATORIAL DYNAMIC REVIEW GENERATOR (100+ Unique Permutations Instantly) ──
+    const OPENINGS = [
+      'honestly so happy with my visit!',
+      'Great experience here.',
+      'Best salon visit I\'ve had in a long time.',
+      'Super clean space and welcoming energy.',
+      'Top tier service from start to finish!',
+      'Walked in today and left feeling refreshed.',
+      'Loved my appointment here today.'
     ];
+    const MIDDLES = [
+      'Staff were super friendly and listened to exactly what I wanted.',
+      'Spotless clean, relaxing atmosphere, and very skilled team.',
+      'Quick in and out, pricing is super fair, and quality is 10/10.',
+      'Attention to detail was amazing and the environment is so cozy.',
+      'Warm hospitality, great expertise, and awesome work.'
+    ];
+    const CLOSINGS = [
+      'Definitely coming back!',
+      'Highly recommend to anyone.',
+      'Will be back for sure!',
+      '5 stars hands down.',
+      'My new go-to place!'
+    ];
+
+    function generateUniqueReview() {
+      const o = OPENINGS[Math.floor(Math.random() * OPENINGS.length)];
+      const m = MIDDLES[Math.floor(Math.random() * MIDDLES.length)];
+      const c = CLOSINGS[Math.floor(Math.random() * CLOSINGS.length)];
+      return `${o} ${m} ${c}`;
+    }
 
     let redirected = false;
 
-    // Pick a review instantly
-    const selectedReview = REVIEWS_POOL[Math.floor(Math.random() * REVIEWS_POOL.length)];
+    // Generate unique review instantly
+    const selectedReview = generateUniqueReview();
 
     // ── COPY CLIPBOARD (Instant) ────────────────────────────────────────────────
     function copyInstantly(text) {

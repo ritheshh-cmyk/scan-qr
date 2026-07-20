@@ -432,22 +432,24 @@
 <div id="toast"></div>
 
 <script>
-  let API_KEY  = '';
+  let API_KEY  = localStorage.getItem('scanqr_admin_key') || '';
   const BASE   = window.location.origin; // same server
 
   // ── Auth ────────────────────────────────────────────────────────────────────
-  async function login() {
-    const key = document.getElementById('apiKeyInput').value.trim();
+  async function login(providedKey) {
+    const key = (providedKey || document.getElementById('apiKeyInput').value.trim() || API_KEY || 'scanqr-admin-2024').trim();
     if (!key) return;
     try {
       const r = await api('/admin/api/businesses', { key });
       if (r.ok) {
         API_KEY = key;
+        localStorage.setItem('scanqr_admin_key', key);
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         loadStatus();
         loadBusinesses();
       } else {
+        localStorage.removeItem('scanqr_admin_key');
         document.getElementById('loginError').style.display = 'block';
       }
     } catch {
@@ -457,8 +459,14 @@
 
   function logout() {
     API_KEY = '';
+    localStorage.removeItem('scanqr_admin_key');
     location.reload();
   }
+
+  // Auto-attempt login on load if key stored or try default
+  window.addEventListener('DOMContentLoaded', () => {
+    if (API_KEY) login(API_KEY);
+  });
 
   // ── API helper ──────────────────────────────────────────────────────────────
   async function api(path, opts = {}) {

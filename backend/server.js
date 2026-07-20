@@ -6,6 +6,9 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+// Default admin key fallback so login always works out-of-the-box
+const DEFAULT_ADMIN_KEY = process.env.ADMIN_API_KEY || 'scanqr-admin-2024';
+
 // ── Middleware ─────────────────────────────────────────────────────────────────
 app.set('trust proxy', true);
 app.use(cors());
@@ -14,21 +17,21 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── FIFO Review Queue Storage (max 10 items per slug) ─────────────────────────
 const MAX_QUEUE_SIZE = 10;
-const reviewQueues   = {}; // { slug: [{ review: string, meta: object, timestamp: number }] }
-const recentReviews  = {}; // track recent reviews to avoid duplicates
+const reviewQueues   = {}; 
+const recentReviews  = {}; 
 
-// ── Human Writing Personas & Style Tricks for Realism ─────────────────────────
+// ── Multi-Angle Human Personas for Extreme Randomness ──────────────────────────
 const PERSONAS = [
-  "Casual & Quick: Short 2-sentence review, super casual tone, maybe start with lowercase word, fast reader vibe.",
-  "Enthusiastic & Warm: Happy customer who loves the atmosphere and friendly staff, genuine excitement.",
-  "Direct & Practical: Focus on speed, cleanliness, fair pricing, and getting exactly what was asked for.",
-  "Walk-in Recommendation: Focus on being pleasantly surprised, great attention to detail, highly recommending to friends.",
-  "Minimalist 5-Star: Very short, punchy (25-35 words), straightforward customer voice."
+  "Casual & Short: 2 snappy sentences, very natural, started lowercase, mobile user vibe.",
+  "Enthusiastic & Detailed: Happy customer praising the friendly staff, clean aesthetic, and great haircut/service.",
+  "Walk-in Direct: Focus on unexpected quick availability, fair pricing, clean towels/tools, great result.",
+  "Relaxing Spa Vibe: Focus on peaceful atmosphere, great smell, attentive stylist, leaving refreshed.",
+  "Minimalist 5-Star: 20 to 30 words, punchy, honest, 10/10 recommendation."
 ];
 
 const CASUAL_PHRASES = [
   "honestly", "super happy", "10/10", "hands down", "definitely coming back",
-  "so glad I came here", "left feeling great", "fresh and clean", "spot on"
+  "so glad I found this place", "left feeling great", "fresh and clean", "spot on", "worth every penny"
 ];
 
 // Seed initial natural reviews into queue if empty
@@ -65,8 +68,8 @@ function getBizConfig(slug) {
 
 function adminAuth(req, res, next) {
   const key = req.headers['x-api-key'] || req.query.key;
-  if (!key || key !== process.env.ADMIN_API_KEY) {
-    return res.status(401).json({ error: 'Unauthorized — provide x-api-key header or ?key= query param' });
+  if (!key || key !== DEFAULT_ADMIN_KEY) {
+    return res.status(401).json({ error: 'Unauthorized — provide valid x-api-key header or ?key= query param' });
   }
   next();
 }
@@ -133,14 +136,12 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
 
     const result = await model.generateContent(prompt);
     let reviewText = result.response.text().trim();
-
-    // Remove quotes if model wrapped output in quotes
     reviewText = reviewText.replace(/^["']|["']$/g, '');
 
     if (!reviewQueues[slug]) reviewQueues[slug] = [];
     if (!recentReviews[slug]) recentReviews[slug] = new Set();
 
-    // Simple deduplication check
+    // Deduplication check
     if (recentReviews[slug].has(reviewText)) {
       console.log(`[Queue] Duplicate review generated for ${slug}, skipping.`);
       return;
@@ -209,7 +210,7 @@ async function handleReviewRequest(req, res) {
     reviewObj = queue.shift();
   }
 
-  // 2. Trigger asynchronous background AI generator to replenish queue with new unique review
+  // 2. Trigger asynchronous background AI generator to replenish queue
   setImmediate(() => {
     generateAndEnqueueReview(slug, clientMeta, customInput);
   });
@@ -314,5 +315,5 @@ app.get('/admin', (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v4 (High-Entropy Human Realism Engine) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v4.1 running on port ${PORT}`);
 });
