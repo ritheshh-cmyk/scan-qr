@@ -267,7 +267,6 @@
   .add-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   @media (max-width: 600px) { .add-form-grid { grid-template-columns: 1fr; } }
 
-  /* misc */
   .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; }
   .empty { color: var(--muted); font-size: 0.88rem; padding: 32px 0; text-align: center; }
   .key-display { font-family: monospace; background: var(--bg); padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; color: var(--accent2); border: 1px solid var(--border); word-break: break-all; }
@@ -283,7 +282,7 @@
     <div class="logo">⚡</div>
     <h1>ScanQR Admin</h1>
     <p>Enter your admin API key to continue</p>
-    <input id="apiKeyInput" type="password" placeholder="Admin API key…" style="margin-bottom:14px">
+    <input id="apiKeyInput" type="password" placeholder="Default key: Lucky@000" style="margin-bottom:14px">
     <button class="btn btn-primary" onclick="login()">Sign In</button>
     <p id="loginError" style="color:var(--danger);font-size:0.82rem;margin-top:12px;display:none">Invalid API key</p>
   </div>
@@ -300,6 +299,7 @@
 
   <div class="tabs">
     <div class="tab active" onclick="switchTab('status',this)" id="tab-status">📊 Status</div>
+    <div class="tab" onclick="switchTab('analytics',this)" id="tab-analytics">📈 Analytics</div>
     <div class="tab" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
     <div class="tab" onclick="switchTab('settings',this)" id="tab-settings">⚙️ Settings</div>
   </div>
@@ -326,6 +326,31 @@
             </tr>
           </thead>
           <tbody id="statusBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── ANALYTICS tab ───────────────────────────────────── -->
+    <div id="tab-content-analytics" style="display:none">
+      <div class="stats" id="analyticsStatsRow"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>📊 Real-Time Scan Activity Log</h3>
+          <button class="btn btn-ghost btn-sm" onclick="loadAnalytics()">↻ Refresh</button>
+        </div>
+        <table class="status-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Date</th>
+              <th>Business</th>
+              <th>Device</th>
+              <th>Time of Day</th>
+              <th>Review Engine Source</th>
+            </tr>
+          </thead>
+          <tbody id="analyticsLogBody"></tbody>
         </table>
       </div>
     </div>
@@ -375,15 +400,15 @@
       <div class="card">
         <div class="card-header"><h3>🔑 API Keys</h3></div>
         <div class="settings-row">
-          <label>Gemini API Key (global — used for all businesses unless overridden)</label>
-          <input id="geminiKeyInput" type="text" placeholder="AIza…">
+          <label>Gemini API Key (global — active on backend)</label>
+          <input id="geminiKeyInput" type="text" placeholder="AIzaSy…">
         </div>
         <div class="settings-row">
-          <label>Admin API Key (used to access this panel)</label>
-          <input id="adminKeyInput" type="password" placeholder="Current key hidden">
+          <label>Admin API Key (used to access this panel — default: Lucky@000)</label>
+          <input id="adminKeyInput" type="password" placeholder="Current key: Lucky@000">
         </div>
         <div style="font-size:0.78rem;color:var(--warn);margin-bottom:16px">
-          ⚠️ Saving here updates in-memory only. Go to <strong>Render Dashboard → Environment</strong> to persist changes permanently.
+          ⚠️ Saving here updates in-memory. Go to <strong>Render Dashboard → Environment</strong> to persist permanently.
         </div>
         <button class="btn btn-success btn-sm" onclick="saveSettings()">Save Keys</button>
       </div>
@@ -433,11 +458,11 @@
 
 <script>
   let API_KEY  = localStorage.getItem('scanqr_admin_key') || '';
-  const BASE   = window.location.origin; // same server
+  const BASE   = window.location.origin;
 
   // ── Auth ────────────────────────────────────────────────────────────────────
   async function login(providedKey) {
-    const key = (providedKey || document.getElementById('apiKeyInput').value.trim() || API_KEY || 'scanqr-admin-2024').trim();
+    const key = (providedKey || document.getElementById('apiKeyInput').value.trim() || API_KEY || 'Lucky@000').trim();
     if (!key) return;
     try {
       const r = await api('/admin/api/businesses', { key });
@@ -447,7 +472,9 @@
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         loadStatus();
+        loadAnalytics();
         loadBusinesses();
+        loadSettings();
       } else {
         localStorage.removeItem('scanqr_admin_key');
         document.getElementById('loginError').style.display = 'block';
@@ -463,7 +490,6 @@
     location.reload();
   }
 
-  // Auto-attempt login on load if key stored or try default
   window.addEventListener('DOMContentLoaded', () => {
     if (API_KEY) login(API_KEY);
   });
@@ -491,11 +517,13 @@
   function switchTab(name, el) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
-    ['status','businesses','settings'].forEach(t => {
+    ['status','analytics','businesses','settings'].forEach(t => {
       document.getElementById(`tab-content-${t}`).style.display = t === name ? '' : 'none';
     });
     if (name === 'status')      loadStatus();
+    if (name === 'analytics')   loadAnalytics();
     if (name === 'businesses')  loadBusinesses();
+    if (name === 'settings')    loadSettings();
   }
 
   // ── STATUS tab ──────────────────────────────────────────────────────────────
@@ -506,7 +534,6 @@
     try {
       const data = await apiJSON('/admin/api/status');
 
-      // Stats row
       const totalSites = data.sites.length;
       const upSites    = data.sites.filter(s => s.status === 'up').length;
       document.getElementById('statsRow').innerHTML = `
@@ -516,7 +543,6 @@
         <div class="stat-card"><div class="stat-label">Gemini AI</div><div class="stat-value ${data.geminiConfigured ? 'up' : ''}" style="${data.geminiConfigured ? '' : 'color:var(--warn)'}">${data.geminiConfigured ? 'Configured' : 'Not Set'}</div></div>
       `;
 
-      // Table
       const tbody = document.getElementById('statusBody');
       if (!data.sites.length) {
         tbody.innerHTML = '<tr><td colspan="5" class="empty">No businesses registered yet.</td></tr>';
@@ -538,6 +564,43 @@
     }
 
     document.getElementById('loadingSpinner').style.display = 'none';
+  }
+
+  // ── ANALYTICS tab ──────────────────────────────────────────────────────────
+  async function loadAnalytics() {
+    try {
+      const data = await apiJSON('/admin/api/analytics');
+
+      const mobileCount = data.deviceStats.Smartphone || 0;
+      const desktopCount = data.deviceStats.Desktop || 0;
+      const totalDevs = mobileCount + desktopCount || 1;
+      const mobilePct = Math.round((mobileCount / totalDevs) * 100);
+
+      document.getElementById('analyticsStatsRow').innerHTML = `
+        <div class="stat-card"><div class="stat-label">Total Scans</div><div class="stat-value accent">${data.totalScans}</div></div>
+        <div class="stat-card"><div class="stat-label">Unique Visitors</div><div class="stat-value up">${data.uniqueVisitors}</div></div>
+        <div class="stat-card"><div class="stat-label">Mobile Traffic</div><div class="stat-value accent">${mobilePct}%</div></div>
+        <div class="stat-card"><div class="stat-label">Log Entries</div><div class="stat-value up">${data.logs.length}</div></div>
+      `;
+
+      const tbody = document.getElementById('analyticsLogBody');
+      if (!data.logs.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No scan activity logged yet. Scan a QR code to see live activity.</td></tr>';
+      } else {
+        tbody.innerHTML = data.logs.map(l => `
+          <tr>
+            <td>${l.timestamp}</td>
+            <td>${l.date}</td>
+            <td><code style="font-size:0.78rem;color:var(--accent)">${l.slug}</code></td>
+            <td>${l.deviceType}</td>
+            <td>${l.timeOfDay}</td>
+            <td><span class="badge badge-ai">${l.source}</span></td>
+          </tr>
+        `).join('');
+      }
+    } catch (err) {
+      toast('Failed to load analytics', 'error');
+    }
   }
 
   function statusBadge(s) {
@@ -609,7 +672,6 @@
     }
   }
 
-  // ── Edit modal ──────────────────────────────────────────────────────────────
   function openEdit(b) {
     document.getElementById('edit-slug').value      = b.slug;
     document.getElementById('edit-name').value      = b.name || '';
@@ -641,7 +703,6 @@
     }
   }
 
-  // ── Test AI review ──────────────────────────────────────────────────────────
   async function testReview(slug) {
     toast('Generating AI review…', 'success');
     const r = await apiJSON(`/api/review/${slug}`);
@@ -652,7 +713,16 @@
     }
   }
 
-  // ── Settings ────────────────────────────────────────────────────────────────
+  // ── SETTINGS tab (Auto-loads Gemini key for display) ────────────────────────
+  async function loadSettings() {
+    try {
+      const data = await apiJSON('/admin/api/settings');
+      if (data.geminiApiKey) {
+        document.getElementById('geminiKeyInput').value = data.geminiApiKey;
+      }
+    } catch {}
+  }
+
   async function saveSettings() {
     const body = {
       geminiApiKey: document.getElementById('geminiKeyInput').value.trim() || undefined,
@@ -661,14 +731,11 @@
     const r = await api('/admin/api/settings', { method: 'POST', body });
     if (r.ok) {
       toast('Keys updated in-memory. Update Render env vars to persist.', 'success');
-      document.getElementById('geminiKeyInput').value = '';
-      document.getElementById('adminKeyInput').value  = '';
     } else {
       toast('Failed to save', 'error');
     }
   }
 
-  // ── Toast ────────────────────────────────────────────────────────────────────
   function toast(msg, type = 'success') {
     const el = document.getElementById('toast');
     el.textContent = msg;
@@ -677,7 +744,6 @@
     el._timer = setTimeout(() => el.classList.remove('show'), 3500);
   }
 
-  // ── Enter key on login ───────────────────────────────────────────────────────
   document.getElementById('apiKeyInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') login();
   });

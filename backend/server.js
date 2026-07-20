@@ -6,8 +6,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// Default admin key fallback so login always works out-of-the-box
-const DEFAULT_ADMIN_KEY = process.env.ADMIN_API_KEY || 'scanqr-admin-2024';
+// Default admin key fallback updated to Lucky@000
+const DEFAULT_ADMIN_KEY = process.env.ADMIN_API_KEY || 'Lucky@000';
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
 app.set('trust proxy', true);
@@ -19,6 +19,41 @@ app.use(express.static(path.join(__dirname, 'public')));
 const MAX_QUEUE_SIZE = 10;
 const reviewQueues   = {}; 
 const recentReviews  = {}; 
+
+// ── Analytics Tracker Storage ──────────────────────────────────────────────────
+const analyticsStore = {
+  totalScans: 0,
+  uniqueIps: new Set(),
+  deviceStats: { Smartphone: 0, Desktop: 0 },
+  timeStats: { Morning: 0, Afternoon: 0, Evening: 0 },
+  logs: [] // max 100 recent scan logs
+};
+
+function recordScanEvent(slug, meta, reviewSource) {
+  analyticsStore.totalScans++;
+  if (meta.ip) analyticsStore.uniqueIps.add(meta.ip);
+
+  const device = meta.deviceType || 'Smartphone';
+  analyticsStore.deviceStats[device] = (analyticsStore.deviceStats[device] || 0) + 1;
+
+  const tod = meta.timeOfDay || 'Afternoon';
+  analyticsStore.timeStats[tod] = (analyticsStore.timeStats[tod] || 0) + 1;
+
+  analyticsStore.logs.unshift({
+    id: Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+    timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    slug: slug || 'demo',
+    ip: meta.ip || '127.0.0.1',
+    deviceType: device,
+    timeOfDay: tod,
+    source: reviewSource || 'FIFO Queue'
+  });
+
+  if (analyticsStore.logs.length > 100) {
+    analyticsStore.logs.pop();
+  }
+}
 
 // ── Multi-Angle Human Personas for Extreme Randomness ──────────────────────────
 const PERSONAS = [
@@ -34,7 +69,6 @@ const CASUAL_PHRASES = [
   "so glad I found this place", "left feeling great", "fresh and clean", "spot on", "worth every penny"
 ];
 
-// Seed initial natural reviews into queue if empty
 function seedQueueIfEmpty(slug, config) {
   if (!reviewQueues[slug]) reviewQueues[slug] = [];
 
@@ -91,7 +125,7 @@ function getClientMetadata(req) {
   return { ip, userAgent, deviceType, lang, timeOfDay, timestamp: Date.now() };
 }
 
-// ── Background Worker: Generate new AI review with Maximum Entropy & Human Tone ─
+// ── Background Worker: Generate new AI review with High Entropy ────────────────
 async function generateAndEnqueueReview(slug, meta, customInput = {}) {
   const config = getBizConfig(slug) || {};
   const geminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
@@ -101,7 +135,6 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
   const type = config.type || 'salon';
   const name = config.name || 'the salon';
 
-  // Pick random persona & casual phrase seed for maximum entropy
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
   const randomSeed      = `${Date.now()}_${Math.floor(Math.random() * 999999)}_${meta.ip}`;
@@ -128,7 +161,7 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
       model: 'gemini-1.5-flash',
       systemInstruction: systemInstruction,
       generationConfig: {
-        temperature: 1.0, // Maximum randomness & creative diversity
+        temperature: 1.0,
         topP: 0.95,
         topK: 40
       }
@@ -141,9 +174,7 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
     if (!reviewQueues[slug]) reviewQueues[slug] = [];
     if (!recentReviews[slug]) recentReviews[slug] = new Set();
 
-    // Deduplication check
     if (recentReviews[slug].has(reviewText)) {
-      console.log(`[Queue] Duplicate review generated for ${slug}, skipping.`);
       return;
     }
 
@@ -153,7 +184,6 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
       recentReviews[slug].delete(firstItem);
     }
 
-    // Push new review into FIFO queue
     reviewQueues[slug].push({
       review: reviewText,
       generated: true,
@@ -162,12 +192,9 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
       timestamp: Date.now()
     });
 
-    // Bounded FIFO Queue max 10
     while (reviewQueues[slug].length > MAX_QUEUE_SIZE) {
       reviewQueues[slug].shift();
     }
-
-    console.log(`[Queue] Enqueued human-like review for ${slug} (${reviewQueues[slug].length}/${MAX_QUEUE_SIZE})`);
   } catch (err) {
     console.error(`[Queue Error] ${slug}:`, err.message);
   }
@@ -205,12 +232,14 @@ async function handleReviewRequest(req, res) {
   const queue = reviewQueues[slug] || [];
   let reviewObj = null;
 
-  // 1. Instantly pop pre-generated review from FIFO Queue
   if (queue.length > 0) {
     reviewObj = queue.shift();
   }
 
-  // 2. Trigger asynchronous background AI generator to replenish queue
+  // Record scan in real-time analytics
+  recordScanEvent(slug, clientMeta, reviewObj ? (reviewObj.generated ? 'Gemini AI Queue' : 'Initial Seed Queue') : 'Instant Fallback');
+
+  // Asynchronous queue replenishment worker
   setImmediate(() => {
     generateAndEnqueueReview(slug, clientMeta, customInput);
   });
@@ -235,6 +264,32 @@ async function handleReviewRequest(req, res) {
 
 app.get('/api/review/:slug', handleReviewRequest);
 app.post('/api/review/:slug', handleReviewRequest);
+
+// ── ADMIN: Analytics API ───────────────────────────────────────────────────────
+app.get('/admin/api/analytics', adminAuth, (req, res) => {
+  res.json({
+    totalScans: analyticsStore.totalScans,
+    uniqueVisitors: analyticsStore.uniqueIps.size,
+    deviceStats: analyticsStore.deviceStats,
+    timeStats: analyticsStore.timeStats,
+    logs: analyticsStore.logs
+  });
+});
+
+// ── ADMIN: Settings API (returns current Gemini key for display in Admin panel) ──
+app.get('/admin/api/settings', adminAuth, (req, res) => {
+  res.json({
+    geminiApiKey: process.env.GEMINI_API_KEY || '',
+    adminApiKeyConfigured: true
+  });
+});
+
+app.post('/admin/api/settings', adminAuth, (req, res) => {
+  const { geminiApiKey, adminApiKey } = req.body;
+  if (geminiApiKey) process.env.GEMINI_API_KEY = geminiApiKey;
+  if (adminApiKey)  process.env.ADMIN_API_KEY  = adminApiKey;
+  res.json({ success: true, note: 'Updated in-memory. Update env vars on Render to persist.' });
+});
 
 // ── ADMIN: Queue & status APIs ────────────────────────────────────────────────
 app.get('/admin/api/queue/:slug', adminAuth, (req, res) => {
@@ -261,13 +316,6 @@ app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
   }
   process.env[`BIZ_${slug}`] = JSON.stringify(req.body);
   res.json({ success: true, config: req.body });
-});
-
-app.post('/admin/api/settings', adminAuth, (req, res) => {
-  const { geminiApiKey, adminApiKey } = req.body;
-  if (geminiApiKey) process.env.GEMINI_API_KEY = geminiApiKey;
-  if (adminApiKey)  process.env.ADMIN_API_KEY  = adminApiKey;
-  res.json({ success: true });
 });
 
 app.get('/admin/api/status', adminAuth, async (req, res) => {
@@ -315,5 +363,5 @@ app.get('/admin', (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v4.1 running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v4.2 (Analytics + Gemini Key Display + Lucky@000 Auth) running on port ${PORT}`);
 });
