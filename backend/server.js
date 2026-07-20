@@ -161,35 +161,17 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
   const randomSeed      = `${Date.now()}_${Math.floor(Math.random() * 999999)}_${meta.ip}`;
 
-  const systemInstruction =
-    `You are a real everyday person writing a quick 5-star Google review for "${name}", a ${type}.\n` +
-    `CRITICAL INSTRUCTIONS FOR REALISTIC HUMAN TONE:\n` +
-    `1. NEVER sound like an AI, marketing brochure, or corporate copywriter.\n` +
-    `2. Style direction: ${selectedPersona}\n` +
-    `3. Write between 25 and 45 words. Keep it short and natural.\n` +
-    `4. Output ONLY the plain text of the review. No quotes, no preamble, no hashtags, no title.`;
-
-  let prompt = `Write a completely unique, natural 5-star review for ${name} (${type}).\n`;
-  if (customInput.service)   prompt += `Service: ${customInput.service}.\n`;
-  if (customInput.staffName) prompt += `Stylist/Staff: ${customInput.staffName}.\n`;
-  if (customInput.vibe)      prompt += `Atmosphere: ${customInput.vibe}.\n`;
-
-  prompt += `Include a natural casual touch using phrasing like "${selectedPhrase}".\n`;
-  prompt += `Entropy Seed: ${randomSeed}`;
+  const fullPrompt =
+    `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
+    `Style persona: ${selectedPersona}\n` +
+    `Include a natural casual phrase like "${selectedPhrase}".\n` +
+    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
 
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      systemInstruction: systemInstruction,
-      generationConfig: {
-        temperature: 1.0,
-        topP: 0.95,
-        topK: 40
-      }
-    });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(fullPrompt);
     let reviewText = result.response.text().trim();
     reviewText = reviewText.replace(/^["']|["']$/g, '');
 
@@ -302,26 +284,18 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
   const randomSeed      = `${Date.now()}_${Math.floor(Math.random() * 999999)}`;
 
-  const systemInstruction =
-    `You are a real everyday person writing a quick 5-star Google review for "${name}", a ${type}.\n` +
-    `CRITICAL INSTRUCTIONS FOR REALISTIC HUMAN TONE:\n` +
-    `1. NEVER sound like an AI, marketing brochure, or corporate copywriter.\n` +
-    `2. Style direction: ${selectedPersona}\n` +
-    `3. Write between 25 and 45 words. Keep it short and natural.\n` +
-    `4. Output ONLY the plain text of the review. No quotes, no preamble, no hashtags, no title.`;
-
-  const prompt = `Write a completely unique, natural 5-star review for ${name} (${type}). Include phrasing like "${selectedPhrase}". Seed: ${randomSeed}`;
+  const fullPrompt =
+    `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
+    `Style persona: ${selectedPersona}\n` +
+    `Include a natural casual phrase like "${selectedPhrase}".\n` +
+    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
 
   const t0 = Date.now();
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      systemInstruction: systemInstruction,
-      generationConfig: { temperature: 1.0, topP: 0.95, topK: 40 }
-    });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(fullPrompt);
     let reviewText = result.response.text().trim().replace(/^["']|["']$/g, '');
 
     res.json({
@@ -457,5 +431,5 @@ app.get('/admin', (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v6 (Queue Inspector + AI Review Tester + Analytics) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v6.1 running on port ${PORT}`);
 });
