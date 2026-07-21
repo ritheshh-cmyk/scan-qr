@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ScanQR Enterprise Studio v14.0</title>
+<title>ScanQR Enterprise Studio v16.0</title>
 <!-- Google Fonts: Outfit & Inter -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -364,7 +364,7 @@
     border: 1px solid var(--border-light);
     border-radius: 20px;
     padding: 32px;
-    width: min(100% - 32px, 580px);
+    width: min(100% - 32px, 620px);
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 25px 60px rgba(0,0,0,0.6);
@@ -428,6 +428,7 @@
       ⏱️ Auto-Refresh (10s)
     </label>
     <div class="spacer"></div>
+    <span id="offlineAlertBadge" class="badge badge-down" style="display:none;margin-right:8px">⚠️ 50 Backup Engine Active</span>
     <span id="backendBadge" class="backend-badge"><span class="pulse-dot"></span> ☁️ Turso Cloud SQLite Active</span>
     <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
   </div>
@@ -525,13 +526,23 @@
 
     <!-- ── QUEUE INSPECTOR TAB ──────────────────────────────── -->
     <div id="tab-content-queue" style="display:none">
+      <div style="margin-bottom:24px">
+        <div style="font-family:'Outfit',sans-serif;font-size:1.3rem;font-weight:800;margin-bottom:6px">⚡ Multi-Business FIFO Queue Telemetry Overview</div>
+        <div style="font-size:0.88rem;color:var(--muted)">Live review buffer health, AI vs Seed review ratio, 50 offline backup status, and total customer scan pops across every registered business.</div>
+      </div>
+
+      <!-- Multi-Business Queue Summary Overview Cards Grid -->
+      <div class="biz-grid" id="queueSummaryGrid" style="margin-bottom:32px;"></div>
+
       <div class="card">
         <div class="card-header">
-          <h3>📥 Live FIFO Queue Messages Inspector</h3>
+          <h3>🔍 Line-by-Line Queue Buffer Inspector</h3>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <select id="queueSlugSelect" style="width:auto;padding:7px 14px;font-size:0.88rem;" onchange="loadQueueInspector()"></select>
-            <button class="btn btn-ghost btn-sm" onclick="loadQueueInspector()">↻ Refresh</button>
-            <button class="btn btn-ghost btn-sm" onclick="forceGenerateAiForQueue()" style="color:var(--accent-cyan)">⚡ Force-Generate AI</button>
+            <button class="btn btn-ghost btn-sm" onclick="loadQueueInspector()">↻ Refresh Buffer</button>
+            <button class="btn btn-ghost btn-sm" onclick="forceGenerateAiForQueue()" style="color:var(--accent-cyan)">⚡ Force AI Review</button>
+            <button class="btn btn-ghost btn-sm" onclick="generate50BackupsForSelected()" style="color:var(--warning)">⚡ Generate 50 Backups</button>
+            <button class="btn btn-ghost btn-sm" onclick="reseedQueue()" style="color:var(--success)">🔄 Re-Seed Queue</button>
             <button class="btn btn-ghost btn-sm" onclick="flushQueue()" style="color:var(--danger)">🗑️ Flush Queue</button>
           </div>
         </div>
@@ -595,7 +606,7 @@
       </div>
 
       <div class="add-form" id="addForm">
-        <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:1.1rem;margin-bottom:18px">➕ Add New Business (Zero Code Required · 100% Cloud Persisted)</div>
+        <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:1.1rem;margin-bottom:18px">➕ Add New Business (Zero Code Required · Context-Aware Realism)</div>
         <div class="add-form-grid">
           <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Slug (unique ID, e.g. youngwear_fashions)</label><input id="new-slug" type="text" placeholder="e.g. youngwear_fashions"></div>
           <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Business Name</label><input id="new-name" type="text" placeholder="e.g. Youngwear Fashions"></div>
@@ -624,6 +635,8 @@
               <option value="Arabic">🇦🇪 Arabic</option>
             </select>
           </div>
+          <div style="grid-column: span 2"><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Popular Menu / Services / Products (comma separated for realistic AI reviews)</label><input id="new-menu" type="text" placeholder="e.g. fade cut, beard trim, hair spa OR denim jackets, cotton sarees"></div>
+          <div style="grid-column: span 2"><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Specialties & Highlights (comma separated)</label><input id="new-highlights" type="text" placeholder="e.g. spotless clean, warm tea served, friendly staff, fair prices"></div>
           <div style="grid-column: span 2"><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Google Review Link</label><input id="new-google" type="url" placeholder="https://search.google.com/local/writereview?placeid=YOUR_ID"></div>
           <div style="grid-column: span 2"><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Gemini API Key (Optional — overrides global key for this business)</label><input id="new-apikey" type="text" placeholder="AQ.Ab8RN6… (Leave empty to use global key)"></div>
         </div>
@@ -718,6 +731,8 @@
           <option value="Arabic">🇦🇪 Arabic</option>
         </select>
       </div>
+      <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Popular Menu / Services / Products</label><input id="edit-menu" type="text" placeholder="e.g. fade cut, beard trim OR denim jackets"></div>
+      <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Specialties & Highlights</label><input id="edit-highlights" type="text" placeholder="e.g. spotless clean, friendly staff"></div>
       <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Google Review Link</label><input id="edit-google" type="url"></div>
       <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Gemini API Key (Optional — overrides global key)</label><input id="edit-apikey" type="text" placeholder="AQ.Ab8RN6… (Leave empty to use global key)"></div>
     </div>
@@ -854,6 +869,12 @@
     try {
       const data = await apiJSON('/admin/api/status');
 
+      if (data.globalOfflineFallbackCount > 0) {
+        const badge = document.getElementById('offlineAlertBadge');
+        badge.style.display = 'inline-flex';
+        badge.textContent = `⚠️ 50 Backup Active (${data.globalOfflineFallbackCount} served)`;
+      }
+
       const totalSites = data.sites.length;
       document.getElementById('statsRow').innerHTML = `
         <div class="stat-card"><div class="stat-label">Backend Status</div><div class="stat-value up">Online</div></div>
@@ -977,29 +998,92 @@
     document.getElementById('printModal').classList.remove('open');
   }
 
-  // ── QUEUE INSPECTOR TAB ─────────────────────────────────────────────────────
+  // ── UPGRADED FIFO QUEUE INSPECTOR TAB ───────────────────────────────────────
   async function loadQueueInspector() {
     try {
-      const list = await apiJSON('/admin/api/businesses');
+      const summaryData = await apiJSON('/admin/api/queues/summary');
+      const summaryGrid = document.getElementById('queueSummaryGrid');
+
+      summaryGrid.innerHTML = summaryData.summary.map(b => {
+        const fillPct = Math.round((b.queueLength / b.maxQueueSize) * 100);
+        const fillClass = b.queueLength >= 5 ? 'var(--success)' : 'var(--warning)';
+        const keyBadge = b.hasCustomApiKey ? `<span class="badge badge-up" style="font-size:0.72rem">🔑 Custom Key</span>` : `<span class="badge badge-nourl" style="font-size:0.72rem">🌐 Global Key</span>`;
+        const backupBadge = b.offlineBackupCount === 50 ? `<span class="badge badge-up" style="font-size:0.72rem">🛡️ 50 Backups Active</span>` : `<span class="badge badge-nourl" style="font-size:0.72rem">⚠️ No Backups</span>`;
+
+        return `
+          <div class="biz-card" style="position:relative">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+              <div>
+                <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:1.05rem">${b.name}</div>
+                <div style="font-size:0.78rem;color:var(--muted)">slug: <code>${b.slug}</code> · lang: <strong>${b.language}</strong></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+                ${keyBadge}
+                ${backupBadge}
+              </div>
+            </div>
+
+            <!-- Buffer Fill Bar -->
+            <div style="margin-bottom:12px">
+              <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:4px">
+                <span style="color:var(--muted)">Buffer Capacity</span>
+                <span style="font-weight:600;color:${fillClass}">${b.queueLength} / ${b.maxQueueSize} items</span>
+              </div>
+              <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;height:8px;overflow:hidden">
+                <div style="width:${fillPct}%;background:${fillClass};height:100%;transition:width 300ms ease"></div>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.78rem;color:var(--muted);background:var(--bg);padding:10px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px">
+              <div>🤖 AI Queue: <strong style="color:var(--primary)">${b.aiGeneratedCount}</strong></div>
+              <div>🌱 Seed Queue: <strong style="color:var(--success)">${b.seedCount}</strong></div>
+              <div>🛡️ 50 Backups: <strong style="color:var(--accent-cyan)">${b.offlineBackupCount}</strong></div>
+              <div>📲 Total Served: <strong>${b.totalPopped}</strong></div>
+            </div>
+
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" style="flex:1" onclick="selectQueueSlug('${b.slug}')">🔍 Inspect Queue</button>
+              <button class="btn btn-primary btn-sm" onclick="forceGenerateAiForSlug('${b.slug}')">⚡ Force AI</button>
+              <button class="btn btn-ghost btn-sm" onclick="generate50BackupsForSlug('${b.slug}')" style="color:var(--warning)">⚡ 50 Backups</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const list = summaryData.summary;
       const select = document.getElementById('queueSlugSelect');
       const currentVal = select.value;
       
-      select.innerHTML = list.map(b => `<option value="${b.slug}">Business: ${b.name || b.slug} (${b.slug})</option>`).join('');
+      select.innerHTML = list.map(b => `<option value="${b.slug}">Business: ${b.name} (${b.slug})</option>`).join('');
       if (currentVal && list.some(b => b.slug === currentVal)) {
         select.value = currentVal;
       }
 
       const slug = select.value || 'saloon';
-      const container = document.getElementById('queueItemsContainer');
-      container.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted)">Loading active queue buffer…</div>';
+      renderDeepDiveQueue(slug);
+    } catch (err) {
+      document.getElementById('queueItemsContainer').innerHTML = `<div style="padding:30px;text-align:center;color:var(--danger)">Error loading queue telemetry: ${err.message}</div>`;
+    }
+  }
 
+  function selectQueueSlug(slug) {
+    const select = document.getElementById('queueSlugSelect');
+    select.value = slug;
+    renderDeepDiveQueue(slug);
+  }
+
+  async function renderDeepDiveQueue(slug) {
+    const container = document.getElementById('queueItemsContainer');
+    container.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted)">Loading active queue buffer…</div>';
+
+    try {
       const data = await apiJSON(`/admin/api/queue/${slug}`);
 
-      document.getElementById('queueStatsSummary').textContent =
-        `Active Queue Buffer for "${slug}": ${data.queueLength} / ${data.maxSize} items ready for instant 0ms pop`;
+      document.getElementById('queueStatsSummary').innerHTML =
+        `Active Queue Buffer for <strong>"${data.businessName || slug}"</strong>: <strong>${data.queueLength} / ${data.maxSize}</strong> items ready for instant 0ms pop · Total Served: <strong>${data.totalPopped}</strong> · 50 Offline Backups: <strong>${data.backupCount}</strong> · Fallback Popped: <strong>${data.offlineFallbackPopped}</strong>`;
 
       if (!data.items.length) {
-        container.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted)">Queue is empty right now.</div>';
+        container.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted)">Queue is empty right now. Click ⚡ Force AI Review, ⚡ Generate 50 Backups, or 🔄 Re-Seed Queue.</div>';
         return;
       }
 
@@ -1010,10 +1094,55 @@
             <span style="font-size:0.78rem;color:var(--muted)">Added: ${item.timestamp}</span>
           </div>
           <div style="font-size:0.95rem;line-height:1.55;">"${item.review}"</div>
+          ${item.meta && item.meta.persona ? `<div style="font-size:0.78rem;color:var(--muted);margin-top:8px">🎭 Persona: ${item.meta.persona}</div>` : ''}
         </div>
       `).join('');
     } catch (err) {
-      document.getElementById('queueItemsContainer').innerHTML = `<div style="padding:30px;text-align:center;color:var(--danger)">Error loading queue: ${err.message}</div>`;
+      container.innerHTML = `<div style="padding:30px;text-align:center;color:var(--danger)">Error loading queue details: ${err.message}</div>`;
+    }
+  }
+
+  async function generate50BackupsForSlug(slug) {
+    toast(`Generating 50 tailored offline backup reviews for "${slug}"…`, 'success');
+    const r = await api(`/admin/api/config/${slug}/generate-backups`, { method: 'POST' });
+    if (r.ok) {
+      toast(`Generated & Persisted 50 Offline Backup Reviews for "${slug}"!`, 'success');
+      loadQueueInspector();
+      loadBusinesses();
+    } else {
+      toast('Failed to generate 50 backup reviews', 'error');
+    }
+  }
+
+  async function generate50BackupsForSelected() {
+    const slug = document.getElementById('queueSlugSelect').value || 'saloon';
+    generate50BackupsForSlug(slug);
+  }
+
+  async function forceGenerateAiForSlug(slug) {
+    toast(`Triggering Gemini AI generation for "${slug}"…`, 'success');
+    const r = await api(`/admin/api/queue/${slug}/generate`, { method: 'POST' });
+    if (r.ok) {
+      toast(`AI review queued for "${slug}"!`, 'success');
+      setTimeout(loadQueueInspector, 1500);
+    } else {
+      toast('AI generation failed or quota reached', 'error');
+    }
+  }
+
+  async function forceGenerateAiForQueue() {
+    const slug = document.getElementById('queueSlugSelect').value || 'saloon';
+    forceGenerateAiForSlug(slug);
+  }
+
+  async function reseedQueue() {
+    const slug = document.getElementById('queueSlugSelect').value || 'saloon';
+    const r = await api(`/admin/api/queue/${slug}/seed`, { method: 'POST' });
+    if (r.ok) {
+      toast(`Re-seeded human queue for "${slug}"!`, 'success');
+      loadQueueInspector();
+    } else {
+      toast('Failed to re-seed queue', 'error');
     }
   }
 
@@ -1026,18 +1155,6 @@
       loadQueueInspector();
     } else {
       toast('Failed to clear queue', 'error');
-    }
-  }
-
-  async function forceGenerateAiForQueue() {
-    const slug = document.getElementById('queueSlugSelect').value || 'saloon';
-    toast(`Triggering Gemini AI generation for "${slug}"…`, 'success');
-    const r = await api(`/admin/api/queue/${slug}/generate`, { method: 'POST' });
-    if (r.ok) {
-      toast(`AI review queued for "${slug}"!`, 'success');
-      setTimeout(loadQueueInspector, 1500);
-    } else {
-      toast('AI generation failed or quota reached', 'error');
     }
   }
 
@@ -1092,7 +1209,7 @@
           <td><code style="font-size:0.82rem;color:var(--primary)">${l.slug}</code></td>
           <td>${l.deviceType}</td>
           <td>${l.timeOfDay}</td>
-          <td><span class="badge badge-ai">${l.source}</span></td>
+          <td><span class="badge ${l.source.includes('offline') ? 'badge-down' : 'badge-ai'}">${l.source}</span></td>
         </tr>
       `).join('');
     }
@@ -1166,6 +1283,7 @@
         const siteUrl = b.siteUrl || `https://scanqr-beta.vercel.app?biz=${b.slug}`;
         const keyBadge = b.hasCustomApiKey ? `<span class="badge badge-up" style="font-size:0.75rem">🔑 Custom Key: ${b.maskedApiKey}</span>` : `<span class="badge badge-nourl" style="font-size:0.75rem">🌐 Global Key</span>`;
         const langBadge = `<span class="badge badge-ai" style="font-size:0.75rem">🌐 ${b.language || 'English'}</span>`;
+        const backupBadge = b.hasBackup50 ? `<span class="badge badge-up" style="font-size:0.75rem">🛡️ 50 Backups</span>` : `<span class="badge badge-nourl" style="font-size:0.75rem">⚠️ No Backups</span>`;
 
         return `
         <div class="biz-card">
@@ -1177,15 +1295,19 @@
             <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
               ${keyBadge}
               ${langBadge}
+              ${backupBadge}
             </div>
           </div>
+          ${b.menuItems ? `<div style="font-size:0.8rem;color:var(--text-sub);margin-bottom:4px">🍽️ <strong>Items:</strong> ${b.menuItems}</div>` : ''}
+          ${b.highlights ? `<div style="font-size:0.8rem;color:var(--text-sub);margin-bottom:8px">⭐ <strong>Highlights:</strong> ${b.highlights}</div>` : ''}
           ${b.googleReviewLink ? `<div style="font-size:0.8rem;color:var(--muted);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔗 ${b.googleReviewLink}</div>` : ''}
           <div style="font-size:0.82rem;color:var(--accent-cyan);background:var(--bg);padding:8px 12px;border-radius:8px;border:1px solid var(--border);margin-bottom:14px;word-break:break-all">
             🌐 Vercel Link: <a href="${siteUrl}" target="_blank" style="color:var(--accent-cyan);font-weight:600;text-decoration:none">${siteUrl}</a>
           </div>
           <div class="biz-actions">
             <button class="btn btn-success btn-sm" onclick="testReview('${b.slug}')">⚡ Test Gemini AI</button>
-            <button class="btn btn-ghost btn-sm" onclick="openEditModal('${b.slug}','${escapeHtml(b.name || '')}','${escapeHtml(b.type || '')}','${escapeHtml(b.googleReviewLink || '')}','${escapeHtml(b.language || 'English')}','${escapeHtml(b.geminiApiKey || '')}')">✏️ Edit</button>
+            <button class="btn btn-ghost btn-sm" onclick="generate50BackupsForSlug('${b.slug}')" style="color:var(--warning)">⚡ 50 Backups</button>
+            <button class="btn btn-ghost btn-sm" onclick="openEditModal('${b.slug}','${escapeHtml(b.name || '')}','${escapeHtml(b.type || '')}','${escapeHtml(b.googleReviewLink || '')}','${escapeHtml(b.language || 'English')}','${escapeHtml(b.geminiApiKey || '')}','${escapeHtml(b.menuItems || '')}','${escapeHtml(b.highlights || '')}')">✏️ Edit</button>
             ${b.googleReviewLink ? `<a href="${b.googleReviewLink}" target="_blank" class="btn btn-ghost btn-sm" style="color:var(--accent-cyan);text-decoration:none">🔗 Test Google Link</a>` : ''}
             <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${siteUrl}');toast('Vercel URL Copied!','success')">📋 Copy Link</button>
             <button class="btn btn-danger btn-sm" onclick="deleteBusiness('${b.slug}')">🗑️ Delete</button>
@@ -1222,6 +1344,8 @@
       name:             document.getElementById('new-name').value.trim() || slug,
       type:             type,
       language:         document.getElementById('new-lang').value || 'English',
+      menuItems:        document.getElementById('new-menu').value.trim() || undefined,
+      highlights:       document.getElementById('new-highlights').value.trim() || undefined,
       googleReviewLink: document.getElementById('new-google').value.trim(),
       geminiApiKey:     document.getElementById('new-apikey').value.trim() || undefined,
       siteUrl:          `https://scanqr-beta.vercel.app?biz=${slug}`
@@ -1229,21 +1353,24 @@
 
     const r = await api(`/admin/api/config/${slug}`, { method: 'POST', body });
     if (r.ok) {
-      toast(`Business "${body.name}" Added & Persisted to Turso Cloud DB!`, 'success');
+      toast(`Business "${body.name}" Added! Generating 50 offline backup reviews…`, 'success');
       document.getElementById('addForm').classList.remove('open');
+      await generate50BackupsForSlug(slug);
       loadBusinesses();
     } else {
       toast('Failed to save business', 'error');
     }
   }
 
-  function openEditModal(slug, name, type, googleLink, lang, apiKey) {
+  function openEditModal(slug, name, type, googleLink, lang, apiKey, menuItems, highlights) {
     document.getElementById('edit-slug').value = slug;
     document.getElementById('edit-slug-display').value = slug;
     document.getElementById('edit-name').value = name;
     document.getElementById('edit-google').value = googleLink;
     document.getElementById('edit-lang').value = lang || 'English';
     document.getElementById('edit-apikey').value = apiKey || '';
+    document.getElementById('edit-menu').value = menuItems || '';
+    document.getElementById('edit-highlights').value = highlights || '';
 
     const select = document.getElementById('edit-type');
     const customInp = document.getElementById('edit-type-custom');
@@ -1272,6 +1399,8 @@
       name:             document.getElementById('edit-name').value.trim() || slug,
       type:             type,
       language:         document.getElementById('edit-lang').value || 'English',
+      menuItems:        document.getElementById('edit-menu').value.trim() || undefined,
+      highlights:       document.getElementById('edit-highlights').value.trim() || undefined,
       googleReviewLink: document.getElementById('edit-google').value.trim(),
       geminiApiKey:     document.getElementById('edit-apikey').value.trim() || undefined,
       siteUrl:          `https://scanqr-beta.vercel.app?biz=${slug}`

@@ -18,21 +18,27 @@ const DEFAULT_BUSINESSES = {
     type: "saloon",
     googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_SALOON_PLACE_ID",
     siteUrl: "https://scanqr-beta.vercel.app?biz=saloon",
-    language: "English"
+    language: "English",
+    menuItems: "haircut, beard trim, hair spa, scalp massage",
+    highlights: "spotless clean salon, warm tea served, friendly barbers, fair prices"
   },
   youngwear_fashions: {
     name: "Youngwear Fashions",
     type: "clothing store",
     googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_YOUNGWEAR_PLACE_ID",
     siteUrl: "https://scanqr-beta.vercel.app?biz=youngwear_fashions",
-    language: "English"
+    language: "English",
+    menuItems: "denim jackets, cotton sarees, crop tops, casual wear, sneakers",
+    highlights: "trendy styles, comfortable fabric, helpful staff, spotless boutique"
   },
   demo: {
     name: "Demo Beauty Salon",
     type: "salon",
     googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_DEMO_PLACE_ID",
     siteUrl: "https://scanqr-beta.vercel.app?biz=demo",
-    language: "English"
+    language: "English",
+    menuItems: "facial, manicure, pedicure, hair styling",
+    highlights: "cozy atmosphere, gentle staff, great music, quick service"
   }
 };
 
@@ -86,7 +92,7 @@ const dbStore = loadLocalDatabase();
 async function initAndMigrateTurso() {
   if (!tursoClient) return;
   try {
-    // 1. Businesses table
+    // 1. Businesses table (with backupReviews JSON column)
     await tursoClient.execute(`
       CREATE TABLE IF NOT EXISTS businesses (
         slug TEXT PRIMARY KEY,
@@ -96,6 +102,8 @@ async function initAndMigrateTurso() {
         siteUrl TEXT,
         language TEXT,
         geminiApiKey TEXT,
+        menuItems TEXT,
+        highlights TEXT,
         data TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -159,8 +167,8 @@ async function upsertTursoBusiness(slug, cfg) {
   if (!tursoClient) return;
   try {
     await tursoClient.execute({
-      sql: `INSERT INTO businesses (slug, name, type, googleReviewLink, siteUrl, language, geminiApiKey, data)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      sql: `INSERT INTO businesses (slug, name, type, googleReviewLink, siteUrl, language, geminiApiKey, menuItems, highlights, data)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(slug) DO UPDATE SET
               name=excluded.name,
               type=excluded.type,
@@ -168,6 +176,8 @@ async function upsertTursoBusiness(slug, cfg) {
               siteUrl=excluded.siteUrl,
               language=excluded.language,
               geminiApiKey=excluded.geminiApiKey,
+              menuItems=excluded.menuItems,
+              highlights=excluded.highlights,
               data=excluded.data`,
       args: [
         slug,
@@ -177,6 +187,8 @@ async function upsertTursoBusiness(slug, cfg) {
         cfg.siteUrl || `https://scanqr-beta.vercel.app?biz=${slug}`,
         cfg.language || 'English',
         cfg.geminiApiKey || null,
+        cfg.menuItems || null,
+        cfg.highlights || null,
         JSON.stringify(cfg)
       ]
     });
@@ -241,10 +253,28 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── FIFO Review Queue Storage (Strictly Isolated Per Business Slug) ────────────
+// ── FIFO Review Queue & Detailed Telemetry Engine (Per-Business Isolated) ───────
 const MAX_QUEUE_SIZE = 10;
 const reviewQueues   = {}; 
 const recentReviews  = {}; 
+
+// Queue Telemetry Tracker Per Business
+const queueStats = {}; 
+let globalOfflineFallbackCount = 0; // Total times 50 backup reviews were served
+
+function getQueueStats(slug) {
+  const cleanSlug = sanitizeSlug(slug);
+  if (!queueStats[cleanSlug]) {
+    queueStats[cleanSlug] = {
+      totalPopped: 0,
+      offlineFallbackPopped: 0,
+      backupIndex: 0,
+      lastPoppedAt: null,
+      lastGeneratedAt: null
+    };
+  }
+  return queueStats[cleanSlug];
+}
 
 // ── Analytics Tracker Storage ──────────────────────────────────────────────────
 const analyticsStore = {
@@ -252,7 +282,7 @@ const analyticsStore = {
   uniqueIps: new Set(),
   deviceStats: { Smartphone: 0, Desktop: 0 },
   timeStats: { Morning: 0, Afternoon: 0, Evening: 0 },
-  sourceStats: { 'Gemini AI Queue': 0, 'Initial Seed Queue': 0, 'Instant Fallback': 0 },
+  sourceStats: { 'Gemini AI Queue': 0, 'Initial Seed Queue': 0, 'Offline Backup 50': 0 },
   logs: []
 };
 
@@ -404,20 +434,21 @@ function getClientMetadata(req) {
   return { ip, userAgent, deviceType, lang, timeOfDay, timestamp: Date.now() };
 }
 
-// ── Background Worker: Generate new AI review with High Entropy & Multi-Language ────────
+// ── Background Worker: Generate new AI review with Context Realism ─────────────
 async function generateAndEnqueueReview(slug, meta, customInput = {}) {
   const cleanSlug = sanitizeSlug(slug);
   const config    = getBizConfig(cleanSlug);
 
-  // AUTOMATIC KEY FAILOVER MATRIX: Primary Key (custom per business) -> Backup Key (global Render env / Turso)
   const primaryKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
   const backupKey  = process.env.GEMINI_API_KEY;
 
   if (!primaryKey && !backupKey) return;
 
-  const type = config.type || 'business';
-  const name = config.name || cleanSlug;
-  const lang = config.language || 'English';
+  const type       = config.type || 'business';
+  const name       = config.name || cleanSlug;
+  const lang       = config.language || 'English';
+  const menuItems  = config.menuItems ? `Popular Menu/Services: ${config.menuItems}.` : '';
+  const highlights = config.highlights ? `Special Highlights: ${config.highlights}.` : '';
 
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
@@ -425,14 +456,14 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
 
   const fullPrompt =
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
+    `${menuItems} ${highlights}\n` +
     `Language: Write the review naturally in ${lang}.\n` +
     `Style persona: ${selectedPersona}\n` +
-    `Include a natural casual phrase like "${selectedPhrase}".\n` +
+    `Include a natural casual phrase like "${selectedPhrase}". Naturally reference one of the services, items, or highlights if applicable.\n` +
     `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). DO NOT use cliché phrases like '10/10' or '5 stars'. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
 
   let reviewText = null;
   let modelUsed  = null;
-  let usedKey    = primaryKey;
 
   try {
     const genAI = new GoogleGenerativeAI(primaryKey);
@@ -440,16 +471,13 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
     reviewText = res.text;
     modelUsed  = res.modelUsed;
   } catch (primaryErr) {
-    console.warn(`[Primary Key Warning] ${cleanSlug}: ${primaryErr.message}. Attempting failover to backup key…`);
     if (backupKey && backupKey !== primaryKey) {
       try {
         const genAI = new GoogleGenerativeAI(backupKey);
         const res = await generateWithFallbackModel(genAI, fullPrompt);
         reviewText = res.text;
         modelUsed  = res.modelUsed + ' (failover)';
-        usedKey    = backupKey;
       } catch (backupErr) {
-        console.error(`[Backup Key Error] ${cleanSlug}: ${backupErr.message}`);
         return;
       }
     } else {
@@ -483,6 +511,52 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
   while (reviewQueues[cleanSlug].length > MAX_QUEUE_SIZE) {
     reviewQueues[cleanSlug].shift();
   }
+
+  const stats = getQueueStats(cleanSlug);
+  stats.lastGeneratedAt = new Date().toISOString();
+}
+
+// ── 50 TAILORED OFFLINE BACKUP REVIEWS GENERATOR ─────────────────────────────────
+async function generate50BackupReviews(slug) {
+  const cleanSlug = sanitizeSlug(slug);
+  const config    = getBizConfig(cleanSlug);
+  const name      = config.name || cleanSlug;
+  const type      = (config.type || 'store').toLowerCase();
+  const lang      = config.language || 'English';
+
+  const menuArr = config.menuItems ? config.menuItems.split(',').map(s => s.trim()) : [];
+  const highArr = config.highlights ? config.highlights.split(',').map(s => s.trim()) : [];
+
+  const backups = [];
+
+  for (let i = 1; i <= 50; i++) {
+    const item  = menuArr.length ? menuArr[i % menuArr.length] : (type.includes('fashion') ? 'outfits' : 'service');
+    const highlight = highArr.length ? highArr[i % highArr.length] : 'clean vibe and great staff';
+    const phrase = CASUAL_PHRASES[i % CASUAL_PHRASES.length];
+
+    let rev = '';
+    if (i % 5 === 0) {
+      rev = `${phrase} so glad I visited ${name}. got the ${item} and it was fantastic. ${highlight}, definitely coming back!`;
+    } else if (i % 5 === 1) {
+      rev = `Loved my visit to ${name}! The team was warm and welcoming, ${highlight}. Really happy with my ${item}.`;
+    } else if (i % 5 === 2) {
+      rev = `Best ${type} in town! Spotless clean environment at ${name}, excellent ${item}, and fair pricing. Highly recommended!`;
+    } else if (i % 5 === 3) {
+      rev = `Walked into ${name} today and left super satisfied. ${phrase} top quality ${item} and ${highlight}.`;
+    } else {
+      rev = `Top tier experience at ${name}! Wonderful ${item}, peaceful atmosphere, and ${highlight}. 100% worth it!`;
+    }
+
+    backups.push(rev);
+  }
+
+  config.backupReviews = backups;
+  dbStore[cleanSlug]   = config;
+
+  await upsertTursoBusiness(cleanSlug, config);
+  saveDatabase(dbStore);
+
+  return backups;
 }
 
 // ── Health Check ──────────────────────────────────────────────────────────────
@@ -499,7 +573,7 @@ app.get('/api/config/:slug', (req, res) => {
   res.json(config);
 });
 
-// ── FAST FIFO QUEUE REVIEW ENDPOINT (< 50ms) ──────────────────────────────────
+// ── FAST FIFO QUEUE REVIEW ENDPOINT (< 50ms) WITH 50 BACKUP FAILOVER ───────────
 async function handleReviewRequest(req, res) {
   const cleanSlug  = sanitizeSlug(req.params.slug) || 'saloon';
   const config     = getBizConfig(cleanSlug);
@@ -507,12 +581,7 @@ async function handleReviewRequest(req, res) {
 
   seedQueueIfEmpty(cleanSlug, config);
 
-  const customInput = {
-    service:   req.query.service || req.body?.service || '',
-    staffName: req.query.staffName || req.body?.staffName || '',
-    vibe:      req.query.vibe || req.body?.vibe || ''
-  };
-
+  const stats = getQueueStats(cleanSlug);
   const queue = reviewQueues[cleanSlug] || [];
   let reviewObj = null;
 
@@ -520,29 +589,40 @@ async function handleReviewRequest(req, res) {
     reviewObj = queue.shift();
   }
 
-  // CONTINUOUS QUEUE REPLENISHMENT: If queue length drops below 5, generate new AI reviews immediately!
+  // CONTINUOUS QUEUE REPLENISHMENT: If queue length drops below 5, generate new AI reviews!
   if (queue.length < 5) {
     setImmediate(() => {
-      generateAndEnqueueReview(cleanSlug, clientMeta, customInput);
+      generateAndEnqueueReview(cleanSlug, clientMeta);
     });
   }
 
+  // 🛡️ OFFLINE / QUOTA EXHAUSTED FAILOVER: Pop from 50 Backup Reviews Array!
   if (!reviewObj) {
-    const name = config.name || cleanSlug;
-    const type = (config.type || 'store').toLowerCase();
-    
-    let fallbackText = `honestly loved my visit to ${name}! clean place, friendly staff, and great quality. Highly recommend.`;
-    if (type.includes('clothing') || type.includes('fashion') || type.includes('boutique') || cleanSlug.includes('fashion') || cleanSlug.includes('wear')) {
-      fallbackText = `honestly so happy with my shopping at ${name}! great clothing collection, fitting was spot on, and staff were super helpful.`;
+    const backups = config.backupReviews && config.backupReviews.length ? config.backupReviews : null;
+    let fallbackText = '';
+
+    if (backups && backups.length > 0) {
+      const idx = stats.backupIndex % backups.length;
+      fallbackText = backups[idx];
+      stats.backupIndex++;
+    } else {
+      const name = config.name || cleanSlug;
+      fallbackText = `honestly loved my visit to ${name}! clean place, friendly staff, and top tier quality. Highly recommend.`;
     }
 
     reviewObj = {
       review: fallbackText,
       generated: false,
-      source: 'instant-human-fallback',
+      source: 'offline-backup-50',
       timestamp: Date.now()
     };
+
+    stats.offlineFallbackPopped++;
+    globalOfflineFallbackCount++;
   }
+
+  stats.totalPopped++;
+  stats.lastPoppedAt = new Date().toISOString();
 
   recordScanEvent(cleanSlug, clientMeta, reviewObj.source);
 
@@ -559,6 +639,23 @@ async function handleReviewRequest(req, res) {
 app.get('/api/review/:slug', handleReviewRequest);
 app.post('/api/review/:slug', handleReviewRequest);
 
+// ── ADMIN: Generate 50 Offline Backup Reviews API ──────────────────────────────
+app.post('/admin/api/config/:slug/generate-backups', adminAuth, async (req, res) => {
+  const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
+  try {
+    const backups = await generate50BackupReviews(cleanSlug);
+    res.json({
+      success: true,
+      slug: cleanSlug,
+      count: backups.length,
+      sample: backups.slice(0, 3),
+      message: `Successfully generated and persisted 50 offline backup reviews for '${cleanSlug}' to Turso Cloud DB!`
+    });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to generate 50 backup reviews: ${err.message}` });
+  }
+});
+
 // ── ADMIN: Direct AI Review Tester ─────────────────────────────────────────────
 app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
   const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
@@ -569,9 +666,11 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
     return res.status(503).json({ error: 'Gemini API Key is missing. Enter a valid key in Settings or Business form.', generated: false });
   }
 
-  const type = config.type || 'business';
-  const name = config.name || cleanSlug;
-  const lang = config.language || 'English';
+  const type       = config.type || 'business';
+  const name       = config.name || cleanSlug;
+  const lang       = config.language || 'English';
+  const menuItems  = config.menuItems ? `Popular Menu/Services: ${config.menuItems}.` : '';
+  const highlights = config.highlights ? `Special Highlights: ${config.highlights}.` : '';
 
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
@@ -579,6 +678,7 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
 
   const fullPrompt =
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
+    `${menuItems} ${highlights}\n` +
     `Language: Write the review naturally in ${lang}.\n` +
     `Style persona: ${selectedPersona}\n` +
     `Include a natural casual phrase like "${selectedPhrase}".\n` +
@@ -605,16 +705,69 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
   }
 });
 
+// ── ADMIN: Comprehensive Per-Business Queue Summary API ───────────────────────
+app.get('/admin/api/queues/summary', adminAuth, (req, res) => {
+  const slugs = new Set([
+    ...Object.keys(dbStore),
+    ...Object.keys(DEFAULT_BUSINESSES),
+    ...Object.keys(reviewQueues)
+  ]);
+
+  const summary = Array.from(slugs).map(slug => {
+    const config = getBizConfig(slug);
+    const q      = reviewQueues[slug] || [];
+    const stats  = getQueueStats(slug);
+
+    const aiCount   = q.filter(i => i.generated).length;
+    const seedCount = q.filter(i => !i.generated).length;
+    const backupCount = config.backupReviews ? config.backupReviews.length : 0;
+
+    return {
+      slug,
+      name:                  config.name || slug,
+      type:                  config.type || 'business',
+      language:              config.language || 'English',
+      menuItems:             config.menuItems || null,
+      highlights:            config.highlights || null,
+      queueLength:           q.length,
+      maxQueueSize:          MAX_QUEUE_SIZE,
+      aiGeneratedCount:      aiCount,
+      seedCount:             seedCount,
+      offlineBackupCount:    backupCount,
+      totalPopped:           stats.totalPopped || 0,
+      offlineFallbackPopped: stats.offlineFallbackPopped || 0,
+      lastPoppedAt:          stats.lastPoppedAt ? new Date(stats.lastPoppedAt).toLocaleTimeString() : 'Never',
+      lastGeneratedAt:       stats.lastGeneratedAt ? new Date(stats.lastGeneratedAt).toLocaleTimeString() : 'Startup',
+      hasCustomApiKey:       !!config.geminiApiKey,
+      googleReviewLink:      config.googleReviewLink || null
+    };
+  });
+
+  res.json({
+    totalBusinesses: summary.length,
+    globalOfflineFallbackCount,
+    summary
+  });
+});
+
 // ── ADMIN: Queue Inspector API ────────────────────────────────────────────────
 app.get('/admin/api/queue/:slug', adminAuth, (req, res) => {
   const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
   const config    = getBizConfig(cleanSlug);
   seedQueueIfEmpty(cleanSlug, config);
-  const q = reviewQueues[cleanSlug] || [];
+
+  const q     = reviewQueues[cleanSlug] || [];
+  const stats = getQueueStats(cleanSlug);
+
   res.json({
     slug: cleanSlug,
+    businessName: config.name || cleanSlug,
     queueLength: q.length,
     maxSize: MAX_QUEUE_SIZE,
+    totalPopped: stats.totalPopped || 0,
+    offlineFallbackPopped: stats.offlineFallbackPopped || 0,
+    backupCount: config.backupReviews ? config.backupReviews.length : 0,
+    lastPoppedAt: stats.lastPoppedAt ? new Date(stats.lastPoppedAt).toLocaleTimeString() : 'Never',
     items: q.map((item, idx) => ({
       position: idx + 1,
       review: item.review,
@@ -630,6 +783,15 @@ app.post('/admin/api/queue/:slug/clear', adminAuth, (req, res) => {
   const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
   reviewQueues[cleanSlug] = [];
   res.json({ success: true, message: `Queue for business '${cleanSlug}' cleared successfully.` });
+});
+
+app.post('/admin/api/queue/:slug/seed', adminAuth, (req, res) => {
+  const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
+  reviewQueues[cleanSlug] = [];
+  const config = getBizConfig(cleanSlug);
+  seedQueueIfEmpty(cleanSlug, config);
+  const q = reviewQueues[cleanSlug] || [];
+  res.json({ success: true, message: `Re-seeded human queue for '${cleanSlug}'. Queue size: ${q.length}` });
 });
 
 app.post('/admin/api/queue/:slug/generate', adminAuth, async (req, res) => {
@@ -668,7 +830,7 @@ app.delete('/admin/api/analytics/clear', adminAuth, (req, res) => {
   analyticsStore.uniqueIps.clear();
   analyticsStore.deviceStats = { Smartphone: 0, Desktop: 0 };
   analyticsStore.timeStats = { Morning: 0, Afternoon: 0, Evening: 0 };
-  analyticsStore.sourceStats = { 'Gemini AI Queue': 0, 'Initial Seed Queue': 0, 'Instant Fallback': 0 };
+  analyticsStore.sourceStats = { 'Gemini AI Queue': 0, 'Initial Seed Queue': 0, 'Offline Backup 50': 0 };
   analyticsStore.logs = [];
   res.json({ success: true, message: 'Analytics history cleared successfully.' });
 });
@@ -735,7 +897,8 @@ app.get('/admin/api/businesses', adminAuth, (req, res) => {
       slug,
       ...(cfg || {}),
       hasCustomApiKey: hasCustomKey,
-      maskedApiKey: maskedKey
+      maskedApiKey: maskedKey,
+      hasBackup50: cfg.backupReviews && cfg.backupReviews.length === 50
     };
   });
 
@@ -752,10 +915,16 @@ app.post('/admin/api/config/:slug', adminAuth, async (req, res) => {
     req.body.siteUrl = `https://scanqr-beta.vercel.app?biz=${cleanSlug}`;
   }
 
+  // Preserve existing backupReviews if not passed
+  const existing = getBizConfig(cleanSlug);
+  if (existing.backupReviews && !req.body.backupReviews) {
+    req.body.backupReviews = existing.backupReviews;
+  }
+
   // 1. Update in-memory persistent dbStore
   dbStore[cleanSlug] = req.body;
 
-  // 2. Persist to Turso Cloud SQLite Database (including custom geminiApiKey)!
+  // 2. Persist to Turso Cloud SQLite Database (including custom geminiApiKey & backupReviews)!
   await upsertTursoBusiness(cleanSlug, req.body);
 
   // 3. Persist to local disk database (db/businesses.json) synchronously
@@ -780,6 +949,7 @@ app.delete('/admin/api/config/:slug', adminAuth, async (req, res) => {
   delete process.env[`BIZ_${cleanSlug}`];
   delete reviewQueues[cleanSlug];
   delete recentReviews[cleanSlug];
+  delete queueStats[cleanSlug];
 
   res.json({ success: true, message: `Business '${cleanSlug}' deleted from Turso Cloud & local DB.` });
 });
@@ -822,6 +992,7 @@ app.get('/admin/api/status', adminAuth, async (req, res) => {
     backend: { status: 'up', uptimeSeconds: Math.floor(process.uptime()), region: process.env.RENDER_REGION || 'unknown' },
     tursoConnected: !!tursoClient,
     geminiConfigured: !!process.env.GEMINI_API_KEY,
+    globalOfflineFallbackCount,
     queues: Object.keys(reviewQueues).reduce((acc, k) => { acc[k] = reviewQueues[k].length; return acc; }, {}),
     sites: checks,
     checkedAt: new Date().toISOString()
@@ -836,10 +1007,14 @@ app.get('/admin', (req, res) => {
 initAndMigrateTurso().then(() => {
   Object.keys(dbStore).forEach(slug => {
     seedQueueIfEmpty(slug, dbStore[slug]);
+    // Auto-generate 50 backup reviews if missing
+    if (!dbStore[slug].backupReviews || dbStore[slug].backupReviews.length === 0) {
+      generate50BackupReviews(slug).catch(() => {});
+    }
   });
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v13.1 (Turso Cloud DB + API Key Persistence) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v16.0 (50 Offline Backup Reviews Engine + Context Realism) running on port ${PORT}`);
 });
