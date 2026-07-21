@@ -1021,6 +1021,20 @@
   let qrObj         = null;
   let currentQrMode = 'registered';
   let bankCurrentPage = 1;
+  let cachedBusinesses = [];
+
+  function getEmojiForType(type) {
+    const t = (type || '').toLowerCase();
+    if (t.includes('mandi')) return '🍗';
+    if (t.includes('restaurant') || t.includes('food') || t.includes('dining')) return '🍽️';
+    if (t.includes('cafe') || t.includes('coffee') || t.includes('bakery')) return '☕';
+    if (t.includes('saloon') || t.includes('barber') || t.includes('haircare')) return '💈';
+    if (t.includes('salon') || t.includes('hair') || t.includes('beauty')) return '💇‍♀️';
+    if (t.includes('spa') || t.includes('massage')) return '🧖‍♀️';
+    if (t.includes('clothing') || t.includes('fashion') || t.includes('wear') || t.includes('boutique')) return '👗';
+    if (t.includes('gym') || t.includes('fitness')) return '💪';
+    return '⚡';
+  }
 
   async function login(providedKey) {
     const key = (providedKey || document.getElementById('apiKeyInput').value.trim() || API_KEY || 'Lucky@000').trim();
@@ -1396,6 +1410,7 @@
   async function loadQrStudio() {
     try {
       const list = await apiJSON('/admin/api/businesses');
+      cachedBusinesses = list;
       const select = document.getElementById('qrBizSelect');
       const curVal = select.value;
 
@@ -1644,16 +1659,24 @@
   function openPrintModal() {
     let targetUrl = '';
     let title = 'ScanQR Review';
+    let emoji = '⚡';
     if (currentQrMode === 'registered') {
       const slug = document.getElementById('qrBizSelect').value || 'prision_mandi';
       targetUrl = `https://scanqr-beta.vercel.app?biz=${slug}`;
-      title = slug.toUpperCase().replace(/_/g, ' ');
+      const biz = cachedBusinesses.find(b => b.slug === slug);
+      if (biz) {
+        title = biz.name || slug.toUpperCase().replace(/_/g, ' ');
+        emoji = getEmojiForType(biz.type);
+      } else {
+        title = slug.toUpperCase().replace(/_/g, ' ');
+      }
     } else {
       targetUrl = document.getElementById('qrCustomInput').value.trim() || 'https://scanqr-beta.vercel.app';
       title = 'Custom Target Review';
     }
     
     document.getElementById('printTitle').textContent = title;
+    document.getElementById('printIcon').textContent = emoji;
     const printContainer = document.getElementById('printQrContainer');
     printContainer.innerHTML = '';
 
@@ -1792,6 +1815,7 @@
     grid.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)">Loading registered businesses…</div>';
     try {
       const list = await apiJSON('/admin/api/businesses');
+      cachedBusinesses = list;
       if (!list.length) { grid.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)">No businesses registered yet. Click + Add New Business.</div>'; return; }
       grid.innerHTML = list.map(b => {
         const siteUrl = b.siteUrl || `https://scanqr-beta.vercel.app?biz=${b.slug}`;

@@ -384,7 +384,172 @@ function getClientMetadata(req) {
 }
 
 // ── 5,000 BULK REVIEW BANK GENERATOR FOR A BUSINESS ────────────────────────────
+
+// Per-category vocabulary banks
+const REVIEW_VOCAB = {
+  // ── SALON / HAIR ──────────────────────────────────────────────────────────────
+  salon: {
+    actions:     ['got my haircut', 'had my hair styled', 'got a blowdry', 'tried their hair spa', 'got highlights done', 'had a keratin treatment', 'went for a hair trim'],
+    compliments: ['the stylist was super skilled', 'they listened to exactly what I wanted', 'my hair looks amazing', 'the finish was flawless', 'best haircut I\'ve had in years', 'incredibly clean setup', 'the staff was so gentle and professional'],
+    openers:     ['just walked out of', 'finally found my go-to salon —', 'visited', 'popped into', 'treated myself at', 'had an appointment at'],
+    closers:     ['already booked my next appointment!', 'my hair has never looked this good.', 'will definitely be back.', '100% recommended.', 'found my new hair salon.', 'super happy with the results.'],
+  },
+  saloon: {
+    actions:     ['got a fresh haircut', 'got my beard trimmed', 'had a hot towel shave', 'tried the hair spa', 'got a scalp massage', 'had a beard styling session'],
+    compliments: ['the barber nailed the fade', 'super clean cuts', 'no waiting time at all', 'the ambiance was really chill', 'very skilled team', 'spotless place with great vibe', 'fair prices for top-tier service'],
+    openers:     ['just came out of', 'dropped by', 'walked into', 'visited', 'finally went to', 'had a session at'],
+    closers:     ['my go-to barber from now on.', 'walked out feeling fresh and confident.', 'best barbershop in the area.', 'will be back every month.', 'highly recommended for all guys.', 'the cut was exactly what I wanted.'],
+  },
+  barbershop: {
+    actions:     ['got a fresh fade', 'had my beard lined up', 'got a hot shave', 'tried their signature cut', 'got a hair design', 'had a complete grooming session'],
+    compliments: ['the barber was super precise', 'clean blade work every time', 'really cool vibe', 'they take their time and get it right', 'best fade in town', 'attention to detail is unreal', 'walked out looking sharp'],
+    openers:     ['just came from', 'finally found a proper barber —', 'dropped by', 'visited', 'checked out', 'been going to'],
+    closers:     ['my new regular spot.', 'the cut was fire.', 'walked out feeling like a new person.', 'already told my friends about this place.', 'top-tier barbershop.', 'will be back for sure.'],
+  },
+  // ── MANDI / ARABIC FOOD ───────────────────────────────────────────────────────
+  'mandi restaurant': {
+    actions:     ['had the mandi', 'tried the alfaham', 'ordered the fried mandi', 'had the grill mandi', 'tried the full mandi platter', 'shared the family mandi', 'ordered the juicy mandi'],
+    compliments: ['the rice was perfectly cooked', 'the meat was fall-off-the-bone tender', 'super generous portions', 'the flavors were incredibly authentic', 'the mandi sauce was 🔥', 'the smoke flavor was amazing', 'best mandi I\'ve had outside home'],
+    openers:     ['just finished a meal at', 'had lunch at', 'visited', 'took my family to', 'tried', 'dropped by'],
+    closers:     ['the mandi was everything.', 'coming back with the whole family.', 'the best mandi spot in town.', 'totally worth it — go try it!', 'left stuffed and happy.', 'authentic taste you can\'t find everywhere.'],
+  },
+  // ── RESTAURANT / GENERAL FOOD ─────────────────────────────────────────────────
+  restaurant: {
+    actions:     ['had an amazing meal', 'tried the special', 'ordered their signature dish', 'had the chef\'s recommendation', 'tried the new menu', 'had a full dining experience'],
+    compliments: ['the food was perfectly cooked', 'super fresh ingredients', 'incredible presentation', 'the flavors were on point', 'really generous portions', 'great ambiance and service', 'attentive and friendly staff'],
+    openers:     ['just dined at', 'had a meal at', 'visited', 'took my family to', 'discovered', 'finally tried'],
+    closers:     ['will definitely be back.', 'one of the best restaurants in the area.', 'fully recommend to anyone.', 'the food was outstanding.', 'great experience from start to finish.', 'already planning my next visit.'],
+  },
+  // ── CLOTHING / FASHION ────────────────────────────────────────────────────────
+  'clothing store': {
+    actions:     ['picked up some amazing outfits', 'found the perfect jeans', 'shopped for casuals', 'got a full outfit', 'found great ethnic wear', 'picked up some trendy pieces', 'got tops and bottoms'],
+    compliments: ['the collection is so fresh and trendy', 'great fabric quality', 'super helpful staff who gave honest suggestions', 'good variety at fair prices', 'the fits were perfect', 'the boutique was clean and well-organized', 'love the styling'],
+    openers:     ['just shopped at', 'finally checked out', 'visited', 'went to', 'dropped by', 'spent some time at'],
+    closers:     ['my wardrobe thanks me.', 'already planning my next shopping trip here.', 'the best fashion store in the area.', 'great value for money.', 'will be back every season.', 'left with a full shopping bag and zero regrets.'],
+  },
+  // ── CAFE / COFFEE SHOP ────────────────────────────────────────────────────────
+  cafe: {
+    actions:     ['had an amazing coffee', 'tried their iced latte', 'had brunch', 'tried the signature drink', 'had a croissant and cappuccino', 'worked here for a few hours', 'had a catch-up over coffee'],
+    compliments: ['the coffee was perfectly brewed', 'really cozy and chill vibe', 'great playlist in the background', 'fast and friendly service', 'the pastries were fresh', 'perfect place to work or relax', 'good WiFi and great seating'],
+    openers:     ['just had the best session at', 'discovered', 'visited', 'spent my afternoon at', 'had a lovely time at', 'stopped by'],
+    closers:     ['my new favorite cafe.', 'the perfect spot for a quiet work session.', 'will be back every week.', 'best coffee in the neighborhood.', 'highly recommend for the vibes alone.', 'a must-visit for any coffee lover.'],
+  },
+  // ── SPA / WELLNESS ───────────────────────────────────────────────────────────
+  spa: {
+    actions:     ['had a relaxing massage', 'tried the facial', 'had a body scrub treatment', 'tried the aromatherapy session', 'had a full spa package', 'got a deep tissue massage'],
+    compliments: ['felt completely rejuvenated', 'the therapist was incredibly skilled', 'super calming atmosphere', 'walked out feeling like a new person', 'attention to detail was impressive', 'beautiful and peaceful setup', 'the products used were premium'],
+    openers:     ['just had the most relaxing session at', 'treated myself to a day at', 'visited', 'spent my afternoon at', 'booked a session at', 'finally tried'],
+    closers:     ['the best spa experience ever.', 'will make this a monthly ritual.', 'completely worth every penny.', 'walked out glowing.', 'my stress just melted away.', 'highly recommend for self-care days.'],
+  },
+  // ── GYM / FITNESS ────────────────────────────────────────────────────────────
+  gym: {
+    actions:     ['had an incredible workout', 'tried their training session', 'used the equipment', 'had a personal training session', 'attended the group class', 'worked out for two hours'],
+    compliments: ['the equipment is top-notch', 'super clean and well-maintained', 'motivating environment', 'the trainers are really knowledgeable', 'great energy in the gym', 'not too crowded', 'really well-organized floor plan'],
+    openers:     ['just finished a session at', 'been training at', 'joined', 'visited', 'finally tried', 'had my first class at'],
+    closers:     ['my new home gym.', 'the gains are real.', 'best decision I made for my fitness.', 'already signed up for the month.', 'the trainers push you to your best.', '100% recommended for anyone serious about fitness.'],
+  },
+  // ── DEFAULT FALLBACK ──────────────────────────────────────────────────────────
+  store: {
+    actions:     ['had a great experience', 'found exactly what I needed', 'was served really well', 'got great value', 'had a smooth visit', 'discovered this gem'],
+    compliments: ['the service was excellent', 'very friendly and helpful team', 'super clean and well-organized', 'fair prices', 'great quality', 'professional and efficient', 'highly attentive staff'],
+    openers:     ['just visited', 'dropped by', 'spent time at', 'checked out', 'tried', 'went to'],
+    closers:     ['will definitely be back.', 'highly recommended.', 'a great find in the area.', 'exceeded my expectations.', 'one of the best around.', 'worth every visit.'],
+  }
+};
+
+function getVocab(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('mandi'))          return REVIEW_VOCAB['mandi restaurant'];
+  if (t.includes('restaurant') || t.includes('food') || t.includes('biryani') || t.includes('kebab')) return REVIEW_VOCAB.restaurant;
+  if (t.includes('barbershop') || t.includes('barber')) return REVIEW_VOCAB.barbershop;
+  if (t.includes('saloon'))         return REVIEW_VOCAB.saloon;
+  if (t.includes('salon') || t.includes('hair') || t.includes('beauty')) return REVIEW_VOCAB.salon;
+  if (t.includes('spa') || t.includes('wellness') || t.includes('massage')) return REVIEW_VOCAB.spa;
+  if (t.includes('clothing') || t.includes('fashion') || t.includes('wear') || t.includes('boutique')) return REVIEW_VOCAB['clothing store'];
+  if (t.includes('cafe') || t.includes('coffee') || t.includes('bakery')) return REVIEW_VOCAB.cafe;
+  if (t.includes('gym') || t.includes('fitness')) return REVIEW_VOCAB.gym;
+  return REVIEW_VOCAB.store;
+}
+
+function pick(arr, seed) { return arr[seed % arr.length]; }
+
 async function generate5kBankForSlug(slug, targetCount = 5000) {
+  const cleanSlug = sanitizeSlug(slug);
+  const config    = getBizConfig(cleanSlug);
+  const name      = config.name || cleanSlug;
+  const type      = (config.type || 'store').toLowerCase();
+  const vocab     = getVocab(type);
+
+  // Supplement with custom menuItems / highlights if configured
+  const customItems = config.menuItems ? config.menuItems.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const customHighs = config.highlights ? config.highlights.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+  if (!tursoClient) throw new Error('Turso Cloud Client is not initialized');
+
+  await tursoClient.execute({ sql: 'DELETE FROM review_bank WHERE slug = ?', args: [cleanSlug] });
+  await tursoClient.execute({ sql: 'INSERT INTO review_bank_pointers (slug, current_pointer) VALUES (?, 0) ON CONFLICT(slug) DO UPDATE SET current_pointer = 0', args: [cleanSlug] });
+
+  console.log(`⚡ Generating ${targetCount} reviews for '${cleanSlug}' (${type}) into Turso Cloud DB…`);
+
+  const batchSize = 250;
+  let inserted = 0;
+
+  for (let batchStart = 0; batchStart < targetCount; batchStart += batchSize) {
+    const currentBatch = Math.min(batchSize, targetCount - batchStart);
+    const statements   = [];
+
+    for (let i = 0; i < currentBatch; i++) {
+      const order = batchStart + i + 1;
+      const id    = `${cleanSlug}_${order}_${Date.now()}`;
+      const seed  = order + i;
+
+      // Pick vocabulary (prefer custom items if available)
+      const action     = customItems.length ? pick(customItems, seed)       : pick(vocab.actions,     seed);
+      const compliment = customHighs.length ? pick(customHighs, seed + 1)  : pick(vocab.compliments, seed + 1);
+      const opener     = pick(vocab.openers,  seed + 2);
+      const closer     = pick(vocab.closers,  seed + 3);
+
+      // 20 unique sentence patterns — all contextually accurate
+      const pat = order % 20;
+      let rev = '';
+
+      if (pat === 0)  rev = `${opener} ${name} and ${action}. ${compliment}. ${closer}`;
+      else if (pat === 1)  rev = `just left ${name} and had to leave a review. ${action} and ${compliment}. ${closer}`;
+      else if (pat === 2)  rev = `stopped by ${name} today — ${action}. ${compliment}. top tier experience!`;
+      else if (pat === 3)  rev = `best ${type} in town, hands down. ${action} at ${name} and ${compliment}. ${closer}`;
+      else if (pat === 4)  rev = `walked into ${name} and ${action} right away. ${compliment}. ${closer}`;
+      else if (pat === 5)  rev = `so glad a friend recommended ${name}! ${action} and ${compliment}. ${closer}`;
+      else if (pat === 6)  rev = `visited ${name} today. ${compliment} and I ${action}. highly recommend!`;
+      else if (pat === 7)  rev = `if you're looking for a great ${type}, go to ${name}. ${action} — ${compliment}. ${closer}`;
+      else if (pat === 8)  rev = `first time visiting ${name} and I'm blown away. ${action} and ${compliment}. ${closer}`;
+      else if (pat === 9)  rev = `can't say enough good things about ${name}! ${action} today and ${compliment}. 100% worth it.`;
+      else if (pat === 10) rev = `had an amazing experience at ${name}. the team was warm, I ${action}, and ${compliment}. ${closer}`;
+      else if (pat === 11) rev = `really great vibe at ${name}. ${action} and ${compliment}. ${closer}`;
+      else if (pat === 12) rev = `loved my time at ${name}! ${action} and ${compliment}. ${closer}`;
+      else if (pat === 13) rev = `dropped in at ${name} today. ${action} — ${compliment}. ${closer}`;
+      else if (pat === 14) rev = `always a pleasure visiting ${name}. consistently ${action} and ${compliment}. my go-to spot.`;
+      else if (pat === 15) rev = `fair prices, awesome staff, and ${action} at ${name}. ${compliment}. ${closer}`;
+      else if (pat === 16) rev = `visited ${name} this afternoon. ${action} and left feeling super satisfied. ${compliment}. ${closer}`;
+      else if (pat === 17) rev = `outstanding service at ${name}! ${action} — ${compliment}. ${closer}`;
+      else if (pat === 18) rev = `recommend ${name} to everyone looking for a great ${type}. ${action} and ${compliment}. ${closer}`;
+      else                 rev = `really happy with my visit to ${name} today. ${action} and ${compliment}. ${closer}`;
+
+      // Capitalize first letter
+      rev = rev.charAt(0).toUpperCase() + rev.slice(1);
+
+      statements.push({
+        sql: 'INSERT INTO review_bank (id, slug, review, review_order) VALUES (?, ?, ?, ?)',
+        args: [id, cleanSlug, rev, order]
+      });
+    }
+
+    await tursoClient.batch(statements, 'write');
+    inserted += currentBatch;
+  }
+
+  console.log(`✅ Generated & stored ${inserted} contextual reviews for '${cleanSlug}' (${type}) in Turso Cloud DB!`);
+  return inserted;
+}
   const cleanSlug = sanitizeSlug(slug);
   const config    = getBizConfig(cleanSlug);
   const name      = config.name || cleanSlug;
