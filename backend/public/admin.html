@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ScanQR Enterprise Studio v11.1</title>
+<title>ScanQR Enterprise Studio v12.0</title>
 <!-- QRCode.js library for Instant QR Generation -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
@@ -302,7 +302,7 @@
       ⏱️ Auto-Refresh (10s)
     </label>
     <div class="spacer"></div>
-    <span id="backendBadge" class="backend-badge">● Backend Online</span>
+    <span id="backendBadge" class="backend-badge">● Backend Online (Disk DB Persistent)</span>
     <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
   </div>
 
@@ -312,7 +312,7 @@
     <div class="tab" onclick="switchTab('queue',this)" id="tab-queue">📥 FIFO Queue Inspector</div>
     <div class="tab" onclick="switchTab('analytics',this)" id="tab-analytics">📈 Analytics</div>
     <div class="tab" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
-    <div class="tab" onclick="switchTab('settings',this)" id="tab-settings">⚙️ Settings</div>
+    <div class="tab" onclick="switchTab('settings',this)" id="tab-settings">⚙️ Settings & DB Backup</div>
   </div>
 
   <div class="content">
@@ -461,12 +461,15 @@
     <!-- ── BUSINESSES tab ──────────────────────────────────── -->
     <div id="tab-content-businesses" style="display:none">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div class="section-title" style="margin:0;font-weight:700;font-size:1.1rem">Registered Businesses</div>
-        <button class="btn btn-success btn-sm" onclick="toggleAddForm()">+ Add New Business</button>
+        <div class="section-title" style="margin:0;font-weight:700;font-size:1.1rem">Registered Businesses (Disk DB Persistent)</div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-ghost btn-sm" onclick="exportDbJson()">📥 Backup DB</button>
+          <button class="btn btn-success btn-sm" onclick="toggleAddForm()">+ Add New Business</button>
+        </div>
       </div>
 
       <div class="add-form" id="addForm">
-        <div style="font-weight:600;margin-bottom:16px">➕ Add New Business (Zero Code Required!)</div>
+        <div style="font-weight:600;margin-bottom:16px">➕ Add New Business (Zero Code Required · 100% DB Persistent!)</div>
         <div class="add-form-grid">
           <div class="row"><label>Slug (unique ID, e.g. youngwear_fashions)</label><input id="new-slug" type="text" placeholder="e.g. youngwear_fashions"></div>
           <div class="row"><label>Business Name</label><input id="new-name" type="text" placeholder="e.g. Youngwear Fashions"></div>
@@ -499,7 +502,7 @@
           <div class="row" style="grid-column: span 2"><label>Gemini API Key (Optional — overrides global key for this business)</label><input id="new-apikey" type="text" placeholder="AQ.Ab8RN6… (Leave empty to use global key)"></div>
         </div>
         <div style="display:flex;gap:10px;margin-top:16px">
-          <button class="btn btn-primary btn-sm" onclick="addBusiness()">Save & Activate Business</button>
+          <button class="btn btn-primary btn-sm" onclick="addBusiness()">Save & Permanently Persist Business</button>
           <button class="btn btn-ghost btn-sm" onclick="toggleAddForm()">Cancel</button>
         </div>
       </div>
@@ -525,6 +528,20 @@
           ⚠️ Saving here updates in-memory instantly. Go to <strong>Render Dashboard → Environment</strong> to persist changes permanently.
         </div>
         <button class="btn btn-success btn-sm" onclick="saveSettings()">Save Keys</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>💾 Turbo Disk Database Backup & Restore</h3></div>
+        <div style="font-size:0.88rem;color:var(--muted);margin-bottom:16px">
+          All businesses, Google Review links, API keys, and settings are saved to <code>backend/db/businesses.json</code> on disk. You can download a backup copy or restore your database in 1 click!
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="exportDbJson()">📥 Backup Database (JSON)</button>
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer">
+            📤 Restore Database (JSON)
+            <input type="file" id="dbFileInput" accept=".json" onchange="importDbJson(event)" style="display:none">
+          </label>
+        </div>
       </div>
     </div>
 
@@ -985,6 +1002,34 @@
     return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
   }
 
+  // ── DATABASE BACKUP & RESTORE ────────────────────────────────────────────────
+  function exportDbJson() {
+    window.open(`${BASE}/admin/api/db/export?key=${encodeURIComponent(API_KEY)}`, '_blank');
+    toast('Downloading Database Backup JSON…', 'success');
+  }
+
+  function importDbJson(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const json = JSON.parse(e.target.result);
+        const r = await api('/admin/api/db/import', { method: 'POST', body: json });
+        if (r.ok) {
+          toast(`Database Restored! ${Object.keys(json).length} Businesses Active & Persisted.`, 'success');
+          loadBusinesses();
+        } else {
+          toast('Failed to restore database', 'error');
+        }
+      } catch (err) {
+        toast(`Invalid JSON File: ${err.message}`, 'error');
+      }
+    };
+    reader.readAsText(file);
+  }
+
   // ── BUSINESSES tab ──────────────────────────────────────────────────────────
   async function loadBusinesses() {
     const grid = document.getElementById('bizGrid');
@@ -1059,7 +1104,7 @@
 
     const r = await api(`/admin/api/config/${slug}`, { method: 'POST', body });
     if (r.ok) {
-      toast(`Business "${body.name}" Added & Activated!`, 'success');
+      toast(`Business "${body.name}" Added & Permanently Persisted!`, 'success');
       document.getElementById('addForm').classList.remove('open');
       loadBusinesses();
     } else {
@@ -1109,7 +1154,7 @@
 
     const r = await api(`/admin/api/config/${slug}`, { method: 'POST', body });
     if (r.ok) {
-      toast(`Business "${body.name}" Updated Successfully!`, 'success');
+      toast(`Business "${body.name}" Updated & Persisted!`, 'success');
       closeEditModal();
       loadBusinesses();
     } else {
@@ -1121,7 +1166,7 @@
     if (!confirm(`Are you sure you want to delete business "${slug}"?`)) return;
     const r = await api(`/admin/api/config/${slug}`, { method: 'DELETE' });
     if (r.ok) {
-      toast(`Business "${slug}" deleted!`, 'success');
+      toast(`Business "${slug}" deleted from disk DB!`, 'success');
       loadBusinesses();
     } else {
       toast('Failed to delete business', 'error');

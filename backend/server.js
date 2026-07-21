@@ -1,6 +1,7 @@
 const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
+const fs      = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app  = express();
@@ -9,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 // Default admin key fallback
 const DEFAULT_ADMIN_KEY = process.env.ADMIN_API_KEY || 'Lucky@000';
 
-// Built-in registered businesses with Vercel frontend site URL
+// Built-in registered businesses fallback
 const DEFAULT_BUSINESSES = {
   saloon: {
     name: "Royal Saloon & Spa",
@@ -33,6 +34,39 @@ const DEFAULT_BUSINESSES = {
     language: "English"
   }
 };
+
+// ── TURBO PERSISTENT DATABASE ENGINE (Disk File Backed) ────────────────────────
+const DB_FILE = path.join(__dirname, 'db', 'businesses.json');
+
+function loadDatabase() {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const content = fs.readFileSync(DB_FILE, 'utf8');
+      const parsed  = JSON.parse(content);
+      if (parsed && typeof parsed === 'object') {
+        return { ...DEFAULT_BUSINESSES, ...parsed };
+      }
+    }
+  } catch (err) {
+    console.error('[DB Load Error]:', err.message);
+  }
+  return { ...DEFAULT_BUSINESSES };
+}
+
+function saveDatabase(dbData) {
+  try {
+    const dir = path.dirname(DB_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(DB_FILE, JSON.stringify(dbData, null, 2), 'utf8');
+    return true;
+  } catch (err) {
+    console.error('[DB Save Error]:', err.message);
+    return false;
+  }
+}
+
+// In-Memory DB loaded from disk on startup
+const dbStore = loadDatabase();
 
 // Candidate Gemini models ordered by performance & availability
 const MODEL_CANDIDATES = [
@@ -138,15 +172,24 @@ function sanitizeSlug(s) {
 
 function getBizConfig(slug) {
   const cleanSlug = sanitizeSlug(slug);
+
+  // 1. Check disk-backed persistent database first!
+  if (dbStore[cleanSlug]) {
+    return dbStore[cleanSlug];
+  }
+
+  // 2. Check process.env
   const raw = process.env[`BIZ_${cleanSlug}`];
   if (raw) {
     try { return JSON.parse(raw); } catch {}
   }
+
+  // 3. Check hardcoded defaults
   if (DEFAULT_BUSINESSES[cleanSlug]) {
     return DEFAULT_BUSINESSES[cleanSlug];
   }
 
-  // DYNAMIC SLUG FALLBACK: Infer name & type from slug so custom business NEVER fails or defaults to Saloon!
+  // 4. DYNAMIC SLUG FALLBACK: Infer name & type from slug so custom business NEVER fails!
   const formattedName = cleanSlug.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   let inferredType = 'store';
   if (cleanSlug.includes('fashion') || cleanSlug.includes('clothing') || cleanSlug.includes('wear')) inferredType = 'clothing store';
@@ -497,6 +540,29 @@ app.delete('/admin/api/analytics/clear', adminAuth, (req, res) => {
   res.json({ success: true, message: 'Analytics history cleared successfully.' });
 });
 
+// ── ADMIN: DATABASE EXPORT & IMPORT APIs ───────────────────────────────────────
+app.get('/admin/api/db/export', adminAuth, (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', 'attachment; filename=businesses_db_backup.json');
+  res.status(200).send(JSON.stringify(dbStore, null, 2));
+});
+
+app.post('/admin/api/db/import', adminAuth, (req, res) => {
+  if (!req.body || typeof req.body !== 'object') {
+    return res.status(400).json({ error: 'Invalid JSON payload' });
+  }
+
+  Object.assign(dbStore, req.body);
+  saveDatabase(dbStore);
+
+  // Seed queues for imported businesses
+  Object.keys(dbStore).forEach(slug => {
+    seedQueueIfEmpty(slug, dbStore[slug]);
+  });
+
+  res.json({ success: true, count: Object.keys(dbStore).length, message: 'Database restored and persisted successfully.' });
+});
+
 // ── ADMIN: Settings API ────────────────────────────────────────────────────────
 app.get('/admin/api/settings', adminAuth, (req, res) => {
   res.json({
@@ -512,9 +578,10 @@ app.post('/admin/api/settings', adminAuth, (req, res) => {
   res.json({ success: true, note: 'Updated in-memory. Update env vars on Render to persist.' });
 });
 
-// ── ADMIN: Business APIs ───────────────────────────────────────────────────────
+// ── ADMIN: Business APIs (Persistent Database Backed) ──────────────────────────
 app.get('/admin/api/businesses', adminAuth, (req, res) => {
   const slugs = new Set([
+    ...Object.keys(dbStore),
     ...Object.keys(DEFAULT_BUSINESSES),
     ...Object.keys(process.env).filter(k => k.startsWith('BIZ_')).map(k => k.replace('BIZ_', '').toLowerCase())
   ]);
@@ -544,9 +611,16 @@ app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
     req.body.siteUrl = `https://scanqr-beta.vercel.app?biz=${cleanSlug}`;
   }
 
+  // 1. Update in-memory persistent dbStore
+  dbStore[cleanSlug] = req.body;
+
+  // 2. Persist to disk database (db/businesses.json) synchronously!
+  saveDatabase(dbStore);
+
+  // 3. Keep env var synced
   process.env[`BIZ_${cleanSlug}`] = JSON.stringify(req.body);
   
-  // Re-seed queue for newly added or updated business immediately
+  // 4. Seed queue immediately
   seedQueueIfEmpty(cleanSlug, req.body);
 
   res.json({ success: true, config: req.body });
@@ -555,6 +629,9 @@ app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
 app.delete('/admin/api/config/:slug', adminAuth, (req, res) => {
   const cleanSlug = sanitizeSlug(req.params.slug);
   
+  delete dbStore[cleanSlug];
+  saveDatabase(dbStore);
+
   delete process.env[`BIZ_${cleanSlug}`];
   delete reviewQueues[cleanSlug];
   delete recentReviews[cleanSlug];
@@ -564,6 +641,7 @@ app.delete('/admin/api/config/:slug', adminAuth, (req, res) => {
 
 app.get('/admin/api/status', adminAuth, async (req, res) => {
   const slugs = new Set([
+    ...Object.keys(dbStore),
     ...Object.keys(DEFAULT_BUSINESSES),
     ...Object.keys(process.env).filter(k => k.startsWith('BIZ_')).map(k => k.replace('BIZ_', '').toLowerCase())
   ]);
@@ -609,11 +687,11 @@ app.get('/admin', (req, res) => {
 });
 
 // ── INITIALIZE QUEUES ON STARTUP ───────────────────────────────────────────────
-Object.keys(DEFAULT_BUSINESSES).forEach(slug => {
-  seedQueueIfEmpty(slug, DEFAULT_BUSINESSES[slug]);
+Object.keys(dbStore).forEach(slug => {
+  seedQueueIfEmpty(slug, dbStore[slug]);
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v11.0 (Enterprise QR Studio & Multi-Language) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v12.0 (Turbo Persistent DB Engine) running on port ${PORT}`);
 });
