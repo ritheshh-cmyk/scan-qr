@@ -3,25 +3,34 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ScanQR Enterprise Studio v12.0</title>
+<title>ScanQR Enterprise Studio v14.0</title>
+<!-- Google Fonts: Outfit & Inter -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
 <!-- QRCode.js library for Instant QR Generation -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+<style>
   :root {
-    --bg:      #0f1117;
-    --surface: #1a1d27;
-    --card:    #21253a;
-    --border:  #2e3350;
-    --accent:  #6c63ff;
-    --accent2: #00d4aa;
-    --danger:  #ff4d6d;
-    --warn:    #f59e0b;
-    --text:    #e8eaf6;
-    --muted:   #8b8fa8;
-    --up:      #22c55e;
-    --down:    #ef4444;
+    --bg:          #090b10;
+    --surface:     #111422;
+    --card:        #171b2d;
+    --card-hover:  #1e233a;
+    --border:      rgba(255, 255, 255, 0.08);
+    --border-light:rgba(255, 255, 255, 0.14);
+    
+    --primary:     #6366f1;
+    --primary-grad:linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    --accent-cyan: #06b6d4;
+    --success:     #10b981;
+    --danger:      #f43f5e;
+    --warning:     #f59e0b;
+    
+    --text:        #f8fafc;
+    --text-sub:    #cbd5e1;
+    --muted:       #94a3b8;
+    --glass:       rgba(17, 20, 34, 0.75);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,244 +40,358 @@
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
+    overflow-x: hidden;
+    background-image: 
+      radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 85% 85%, rgba(168, 85, 247, 0.06) 0%, transparent 40%);
   }
 
-  /* ── Login screen ─────────────────────────────── */
+  h1, h2, h3, h4, .font-heading {
+    font-family: 'Outfit', sans-serif;
+  }
+
+  /* ── Custom Scrollbars ──────────────────────── */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+
+  /* ── Login screen ───────────────────────────── */
   #loginScreen {
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 100vh;
     padding: 24px;
+    background: radial-gradient(circle at center, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
   }
 
   .login-card {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 40px 36px;
-    width: min(100%, 400px);
+    border: 1px solid var(--border-light);
+    border-radius: 24px;
+    padding: 44px 38px;
+    width: min(100%, 420px);
     text-align: center;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(99, 102, 241, 0.1);
+    backdrop-filter: blur(16px);
   }
 
-  .logo { font-size: 2.4rem; margin-bottom: 6px; }
-  .login-card h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; }
-  .login-card p  { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
+  .login-logo {
+    width: 64px; height: 64px;
+    background: var(--primary-grad);
+    border-radius: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35);
+  }
+
+  .login-card h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.02em; }
+  .login-card p  { color: var(--muted); font-size: 0.92rem; margin-bottom: 30px; }
 
   input[type="password"], input[type="text"], input[type="url"], textarea, select {
     width: 100%;
-    padding: 12px 16px;
+    padding: 13px 18px;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     color: var(--text);
     font: inherit;
     font-size: 0.95rem;
-    transition: border 200ms;
+    transition: all 200ms ease;
   }
 
-  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  }
 
   .btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
-    padding: 11px 22px;
+    padding: 12px 24px;
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     font: inherit;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     font-weight: 600;
     cursor: pointer;
-    transition: opacity 150ms, transform 100ms;
+    transition: all 180ms ease;
+    user-select: none;
+    white-space: nowrap;
   }
+
   .btn:active { transform: scale(0.97); }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-  .btn-primary  { background: var(--accent);  color: #fff; width: 100%; justify-content: center; }
-  .btn-success  { background: var(--accent2); color: #000; }
-  .btn-danger   { background: var(--danger);  color: #fff; }
-  .btn-ghost    { background: var(--border);  color: var(--text); }
-  .btn-sm       { padding: 7px 14px; font-size: 0.82rem; border-radius: 8px; }
+  .btn-primary  {
+    background: var(--primary-grad);
+    color: #fff;
+    box-shadow: 0 4px 18px rgba(99, 102, 241, 0.3);
+  }
+  .btn-primary:hover { opacity: 0.95; box-shadow: 0 6px 22px rgba(99, 102, 241, 0.45); }
 
-  /* ── Main layout ──────────────────────────────── */
+  .btn-success  {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.25);
+  }
+
+  .btn-danger   {
+    background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+    color: #fff;
+  }
+
+  .btn-ghost    {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-sub);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { background: rgba(255, 255, 255, 0.09); color: var(--text); border-color: var(--border-light); }
+
+  .btn-sm       { padding: 8px 16px; font-size: 0.84rem; border-radius: 10px; }
+
+  /* ── Main Layout ────────────────────────────── */
   #app { display: none; min-height: 100vh; }
 
   .topbar {
-    background: var(--surface);
+    background: var(--glass);
+    backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--border);
-    padding: 0 28px;
-    height: 60px;
+    padding: 0 32px;
+    height: 68px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 20px;
     position: sticky;
     top: 0;
     z-index: 100;
   }
 
-  .topbar .brand { font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; }
-  .topbar .spacer { flex: 1; }
-  .topbar .backend-badge {
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.78rem;
+  .brand {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--primary-grad);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.01em;
+  }
+
+  .brand-icon {
+    width: 34px; height: 34px;
+    background: var(--primary-grad);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-size: 1.1rem;
+    -webkit-text-fill-color: initial;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+
+  .spacer { flex: 1; }
+
+  .backend-badge {
+    padding: 6px 16px;
+    border-radius: 30px;
+    font-size: 0.8rem;
     font-weight: 600;
-    background: rgba(34, 197, 94, 0.15);
-    color: var(--up);
-    border: 1px solid rgba(34, 197, 94, 0.3);
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pulse-dot {
+    width: 8px; height: 8px;
+    background: var(--success);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
   }
 
   .auto-refresh-toggle {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 0.82rem;
+    gap: 8px;
+    font-size: 0.84rem;
     color: var(--muted);
     user-select: none;
     cursor: pointer;
-    background: var(--bg);
-    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 7px 14px;
     border-radius: 20px;
     border: 1px solid var(--border);
+    transition: all 150ms ease;
   }
+  .auto-refresh-toggle:hover { border-color: var(--border-light); color: var(--text-sub); }
 
-  .tabs {
+  .tabs-nav {
     display: flex;
-    gap: 4px;
-    padding: 0 28px;
+    gap: 6px;
+    padding: 6px 32px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
+    overflow-x: auto;
   }
 
-  .tab {
-    padding: 14px 18px;
-    font-size: 0.88rem;
-    font-weight: 500;
+  .tab-item {
+    padding: 12px 20px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.92rem;
+    font-weight: 600;
     color: var(--muted);
     cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: color 150ms, border 150ms;
+    border-radius: 10px;
+    transition: all 180ms ease;
     user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-item:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+  .tab-item.active {
+    color: #fff;
+    background: rgba(99, 102, 241, 0.18);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.15);
+  }
 
-  .content { padding: 28px; max-width: 1100px; margin: 0 auto; }
+  .content-area { padding: 32px; max-width: 1240px; margin: 0 auto; }
 
-  /* ── Cards & Grid ─────────────────────────────── */
+  /* ── Cards & Grid ───────────────────────────── */
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 22px 24px;
-    margin-bottom: 20px;
+    border-radius: 20px;
+    padding: 26px 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   }
 
   .card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 18px;
+    margin-bottom: 22px;
   }
 
-  .card-header h3 { font-size: 1rem; font-weight: 600; }
+  .card-header h3 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
 
   .badge {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 3px 10px;
+    gap: 6px;
+    padding: 4px 12px;
     border-radius: 20px;
-    font-size: 0.75rem;
+    font-size: 0.78rem;
     font-weight: 600;
   }
 
-  .badge-up     { background: rgba(34,197,94,.15);  color: var(--up);    border: 1px solid rgba(34,197,94,.3);  }
-  .badge-down   { background: rgba(239,68,68,.15);  color: var(--down);  border: 1px solid rgba(239,68,68,.3);  }
-  .badge-nourl  { background: rgba(139,143,168,.1); color: var(--muted); border: 1px solid var(--border);       }
-  .badge-ai     { background: rgba(108,99,255,.15); color: var(--accent);border: 1px solid rgba(108,99,255,.3); }
+  .badge-up     { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+  .badge-down   { background: rgba(244, 63, 94, 0.15);  color: var(--danger);  border: 1px solid rgba(244, 63, 94, 0.3);  }
+  .badge-nourl  { background: rgba(148, 163, 184, 0.1); color: var(--muted);  border: 1px solid var(--border); }
+  .badge-ai     { background: rgba(99, 102, 241, 0.15); color: var(--primary);border: 1px solid rgba(99, 102, 241, 0.3); }
 
-  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
-  .dot-up   { background: var(--up);   box-shadow: 0 0 6px var(--up);   }
-  .dot-down { background: var(--down); box-shadow: 0 0 6px var(--down); }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px; margin-bottom: 28px; }
 
-  .biz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    transition: transform 180ms ease, border-color 180ms ease;
+  }
+  .stat-card:hover { transform: translateY(-3px); border-color: var(--border-light); }
+
+  .stat-label { font-size: 0.82rem; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+  .stat-value { font-family: 'Outfit', sans-serif; font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; }
+  .stat-value.up { color: var(--success); }
+  .stat-value.accent { color: var(--primary); }
+
+  .biz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
 
   .biz-card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 18px 20px;
+    border-radius: 16px;
+    padding: 22px 24px;
+    transition: all 200ms ease;
   }
+  .biz-card:hover { border-color: rgba(99, 102, 241, 0.4); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
 
-  .biz-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .biz-name { font-weight: 700; font-size: 1rem; }
-  .biz-slug { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
-  .biz-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .biz-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .biz-name { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.1rem; }
+  .biz-slug { font-size: 0.8rem; color: var(--muted); margin-top: 3px; }
+  .biz-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 
   .status-table { width: 100%; border-collapse: collapse; }
-  .status-table th, .status-table td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
-  .status-table th { color: var(--muted); font-weight: 500; }
+  .status-table th, .status-table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  .status-table th { color: var(--muted); font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; }
   .status-table tr:last-child td { border-bottom: none; }
 
-  .settings-row { margin-bottom: 20px; }
-  .settings-row label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 7px; font-weight: 500; }
-
-  /* ── Modal overlay ────────────────────────────── */
+  /* ── Modal Overlay ──────────────────────────── */
   .modal-overlay {
     display: none;
     position: fixed; inset: 0;
-    background: rgba(0,0,0,0.68);
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
     z-index: 200;
     place-items: center;
   }
-
   .modal-overlay.open { display: grid; }
 
   .modal {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 28px;
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    padding: 32px;
     width: min(100% - 32px, 580px);
     max-height: 90vh;
     overflow-y: auto;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.6);
   }
 
-  .modal h3 { font-size: 1.05rem; margin-bottom: 16px; }
-  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-
-  .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
-  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
-  .stat-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; }
-  .stat-value { font-size: 1.7rem; font-weight: 700; }
-  .stat-value.up { color: var(--up); }
-  .stat-value.accent { color: var(--accent); }
+  .modal h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 18px; }
+  .modal-footer { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
 
   #toast {
-    position: fixed; bottom: 24px; right: 24px;
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 10px; padding: 12px 18px;
-    font-size: 0.88rem; font-weight: 500;
-    transform: translateY(80px); opacity: 0;
-    transition: all 300ms ease;
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--card); border: 1px solid var(--border-light);
+    border-radius: 14px; padding: 14px 22px;
+    font-size: 0.9rem; font-weight: 600;
+    transform: translateY(100px); opacity: 0;
+    transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
     z-index: 999;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
   }
-
   #toast.show { transform: translateY(0); opacity: 1; }
-  #toast.success { border-color: var(--up); color: var(--up); }
-  #toast.error   { border-color: var(--danger); color: var(--danger); }
+  #toast.success { border-color: var(--success); color: var(--success); }
+  #toast.error   { border-color: var(--danger);  color: var(--danger);  }
 
-  .add-form { display: none; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin-bottom: 20px; }
+  .add-form { display: none; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 24px; }
   .add-form.open { display: block; }
-  .add-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .add-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-  .key-display { font-family: monospace; background: var(--bg); padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; color: var(--accent2); border: 1px solid var(--border); word-break: break-all; }
-  #loadingSpinner { display: none; text-align: center; padding: 40px; color: var(--muted); }
-  .queue-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
-  
-  .traffic-bar-bg { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; height: 12px; overflow: hidden; margin-top: 8px; display: flex; }
+  .traffic-bar-bg { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; height: 14px; overflow: hidden; margin-top: 10px; display: flex; }
   .traffic-bar-fill { height: 100%; transition: width 300ms ease; }
 
   /* Printable Counter Stand Styling */
@@ -281,57 +404,60 @@
 </head>
 <body>
 
-<!-- ── Login ──────────────────────────────────────────────────── -->
+<!-- ── Login Screen ─────────────────────────────────────────────── -->
 <div id="loginScreen">
   <div class="login-card">
-    <div class="logo">⚡</div>
+    <div class="login-logo">⚡</div>
     <h1>ScanQR Enterprise Studio</h1>
-    <p>Enter your admin API key to continue</p>
-    <input id="apiKeyInput" type="password" placeholder="Default key: Lucky@000" style="margin-bottom:14px">
-    <button class="btn btn-primary" onclick="login()">Sign In</button>
-    <p id="loginError" style="color:var(--danger);font-size:0.82rem;margin-top:12px;display:none">Invalid API key</p>
+    <p>Enter your admin API key to access your multi-business suite</p>
+    <input id="apiKeyInput" type="password" placeholder="Default key: Lucky@000" style="margin-bottom:18px">
+    <button class="btn btn-primary" style="width:100%" onclick="login()">Sign In to Dashboard</button>
+    <p id="loginError" style="color:var(--danger);font-size:0.85rem;margin-top:14px;display:none">Invalid API Key — Access Denied</p>
   </div>
 </div>
 
-<!-- ── App ───────────────────────────────────────────────────── -->
+<!-- ── Main App Dashboard ───────────────────────────────────────── -->
 <div id="app">
   <div class="topbar">
-    <div class="brand">⚡ ScanQR Admin Suite</div>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      ScanQR Enterprise
+    </div>
     <label class="auto-refresh-toggle">
       <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh(this.checked)">
       ⏱️ Auto-Refresh (10s)
     </label>
     <div class="spacer"></div>
-    <span id="backendBadge" class="backend-badge">☁️ Turso Cloud SQLite Active</span>
+    <span id="backendBadge" class="backend-badge"><span class="pulse-dot"></span> ☁️ Turso Cloud SQLite Active</span>
     <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
   </div>
 
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('status',this)" id="tab-status">📊 Status</div>
-    <div class="tab" onclick="switchTab('qrstudio',this)" id="tab-qrstudio">🎨 QR Studio & Instant Generator</div>
-    <div class="tab" onclick="switchTab('queue',this)" id="tab-queue">📥 FIFO Queue Inspector</div>
-    <div class="tab" onclick="switchTab('analytics',this)" id="tab-analytics">📈 Analytics</div>
-    <div class="tab" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
-    <div class="tab" onclick="switchTab('settings',this)" id="tab-settings">⚙️ Settings & DB Backup</div>
+  <div class="tabs-nav">
+    <div class="tab-item active" onclick="switchTab('status',this)" id="tab-status">📊 System Status</div>
+    <div class="tab-item" onclick="switchTab('qrstudio',this)" id="tab-qrstudio">🎨 QR Studio & Instant Generator</div>
+    <div class="tab-item" onclick="switchTab('queue',this)" id="tab-queue">📥 FIFO Queue Inspector</div>
+    <div class="tab-item" onclick="switchTab('analytics',this)" id="tab-analytics">📈 Real-Time Analytics</div>
+    <div class="tab-item" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
+    <div class="tab-item" onclick="switchTab('settings',this)" id="tab-settings">⚙️ Settings & Turso Cloud DB</div>
   </div>
 
-  <div class="content">
+  <div class="content-area">
 
-    <!-- ── STATUS tab ──────────────────────────────────────── -->
+    <!-- ── STATUS TAB ───────────────────────────────────────── -->
     <div id="tab-content-status">
-      <div class="stats" id="statsRow"></div>
+      <div class="stats-grid" id="statsRow"></div>
       <div class="card">
         <div class="card-header">
-          <h3>Site Status</h3>
-          <button class="btn btn-ghost btn-sm" onclick="loadStatus()">↻ Refresh</button>
+          <h3>Registered Sites & Health Status</h3>
+          <button class="btn btn-ghost btn-sm" onclick="loadStatus()">↻ Refresh Status</button>
         </div>
-        <div id="loadingSpinner">Checking sites…</div>
-        <table class="status-table" id="statusTable">
+        <div id="loadingSpinner" style="display:none;text-align:center;padding:30px;color:var(--muted)">Checking registered sites…</div>
+        <table class="status-table">
           <thead>
             <tr>
-              <th>Business</th>
+              <th>Business Name</th>
               <th>Slug</th>
-              <th>URL</th>
+              <th>Live Vercel Link</th>
               <th>Status</th>
               <th>Latency</th>
             </tr>
@@ -341,7 +467,7 @@
       </div>
     </div>
 
-    <!-- ── QR STUDIO & INSTANT GENERATOR tab ───────────────────── -->
+    <!-- ── QR STUDIO TAB ────────────────────────────────────── -->
     <div id="tab-content-qrstudio" style="display:none">
       <div class="card">
         <div class="card-header">
@@ -349,46 +475,46 @@
           <button class="btn btn-success btn-sm" onclick="openPrintModal()">🖨️ Print Counter Stand</button>
         </div>
 
-        <div style="margin-bottom:16px;display:flex;gap:12px;background:var(--bg);padding:6px;border-radius:10px;border:1px solid var(--border);width:fit-content">
-          <label style="font-size:0.85rem;cursor:pointer;padding:6px 12px;border-radius:6px;" id="mode-registered-lbl">
+        <div style="margin-bottom:20px;display:flex;gap:12px;background:var(--bg);padding:6px;border-radius:12px;border:1px solid var(--border);width:fit-content">
+          <label style="font-size:0.88rem;cursor:pointer;padding:8px 16px;border-radius:8px;" id="mode-registered-lbl">
             <input type="radio" name="qrMode" value="registered" checked onchange="switchQrMode(this.value)"> 🏪 Registered Business
           </label>
-          <label style="font-size:0.85rem;cursor:pointer;padding:6px 12px;border-radius:6px;" id="mode-custom-lbl">
-            <input type="radio" name="qrMode" value="custom" onchange="switchQrMode(this.value)"> ⚡ Instant Custom URL/Link
+          <label style="font-size:0.88rem;cursor:pointer;padding:8px 16px;border-radius:8px;" id="mode-custom-lbl">
+            <input type="radio" name="qrMode" value="custom" onchange="switchQrMode(this.value)"> ⚡ Instant Custom Link
           </label>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start">
-          <div style="display:grid;gap:14px">
+        <div style="display:grid;grid-template-columns:1fr 320px;gap:28px;align-items:start">
+          <div style="display:grid;gap:16px">
             <div id="registeredSelectBox">
-              <label style="font-size:0.85rem;color:var(--muted)">Select Business</label>
+              <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">Select Registered Business</label>
               <select id="qrBizSelect" onchange="renderQrStudio()"></select>
             </div>
 
             <div id="customUrlBox" style="display:none">
-              <label style="font-size:0.85rem;color:var(--muted)">Paste Any Custom URL / Link / Text</label>
+              <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">Paste Any Custom URL / Link / Text</label>
               <input id="qrCustomInput" type="url" placeholder="https://search.google.com/local/writereview?placeid=YOUR_ID or https://yourdomain.com" oninput="renderQrStudio()">
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
               <div>
-                <label style="font-size:0.85rem;color:var(--muted)">QR Dark Color</label>
-                <input id="qrDarkColor" type="color" value="#6c63ff" onchange="renderQrStudio()" style="height:44px;padding:4px;cursor:pointer">
+                <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">QR Dark Color</label>
+                <input id="qrDarkColor" type="color" value="#6366f1" onchange="renderQrStudio()" style="height:46px;padding:4px;cursor:pointer">
               </div>
               <div>
-                <label style="font-size:0.85rem;color:var(--muted)">QR Light Color</label>
-                <input id="qrLightColor" type="color" value="#ffffff" onchange="renderQrStudio()" style="height:44px;padding:4px;cursor:pointer">
+                <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">QR Light Color</label>
+                <input id="qrLightColor" type="color" value="#ffffff" onchange="renderQrStudio()" style="height:46px;padding:4px;cursor:pointer">
               </div>
             </div>
             <div>
-              <label style="font-size:0.85rem;color:var(--muted)">Active Target URL</label>
-              <input id="qrTargetUrl" type="text" readonly style="opacity:0.75;font-weight:600;color:var(--accent2)">
+              <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">Active Target URL</label>
+              <input id="qrTargetUrl" type="text" readonly style="opacity:0.85;font-weight:600;color:var(--accent-cyan)">
             </div>
           </div>
 
-          <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center">
-            <div id="qrCanvasContainer" style="display:inline-block;padding:12px;background:#fff;border-radius:12px;margin-bottom:14px"></div>
-            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <div style="background:var(--card);border:1px solid var(--border-light);border-radius:18px;padding:24px;text-align:center">
+            <div id="qrCanvasContainer" style="display:inline-block;padding:16px;background:#fff;border-radius:16px;margin-bottom:18px;box-shadow:0 10px 25px rgba(0,0,0,0.3)"></div>
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
               <button class="btn btn-primary btn-sm" onclick="downloadQrPng()">📥 Download PNG</button>
               <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('qrTargetUrl').value);toast('URL Copied!','success')">📋 Copy Link</button>
             </div>
@@ -397,44 +523,44 @@
       </div>
     </div>
 
-    <!-- ── QUEUE INSPECTOR tab ──────────────────────────────── -->
+    <!-- ── QUEUE INSPECTOR TAB ──────────────────────────────── -->
     <div id="tab-content-queue" style="display:none">
       <div class="card">
         <div class="card-header">
           <h3>📥 Live FIFO Queue Messages Inspector</h3>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-            <select id="queueSlugSelect" style="width:auto;padding:6px 12px;font-size:0.85rem;" onchange="loadQueueInspector()"></select>
+            <select id="queueSlugSelect" style="width:auto;padding:7px 14px;font-size:0.88rem;" onchange="loadQueueInspector()"></select>
             <button class="btn btn-ghost btn-sm" onclick="loadQueueInspector()">↻ Refresh</button>
-            <button class="btn btn-ghost btn-sm" onclick="forceGenerateAiForQueue()" style="color:var(--accent2)">⚡ Force-Generate AI</button>
+            <button class="btn btn-ghost btn-sm" onclick="forceGenerateAiForQueue()" style="color:var(--accent-cyan)">⚡ Force-Generate AI</button>
             <button class="btn btn-ghost btn-sm" onclick="flushQueue()" style="color:var(--danger)">🗑️ Flush Queue</button>
           </div>
         </div>
 
-        <div id="queueStatsSummary" style="font-size:0.88rem;color:var(--muted);margin-bottom:16px">Loading queue items…</div>
+        <div id="queueStatsSummary" style="font-size:0.9rem;color:var(--muted);margin-bottom:18px">Loading active queue buffer…</div>
         <div id="queueItemsContainer"></div>
       </div>
     </div>
 
-    <!-- ── ANALYTICS tab ───────────────────────────────────── -->
+    <!-- ── ANALYTICS TAB ────────────────────────────────────── -->
     <div id="tab-content-analytics" style="display:none">
-      <div class="stats" id="analyticsStatsRow"></div>
+      <div class="stats-grid" id="analyticsStatsRow"></div>
 
-      <div class="card" style="margin-bottom:20px;">
+      <div class="card" style="margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <div style="font-size:0.88rem;font-weight:600">📱 Traffic Device Split</div>
-          <div id="deviceSplitText" style="font-size:0.82rem;color:var(--muted)">0% Smartphone · 0% Desktop</div>
+          <div style="font-size:0.92rem;font-weight:600">📱 Traffic Device Split</div>
+          <div id="deviceSplitText" style="font-size:0.85rem;color:var(--muted)">0% Smartphone · 0% Desktop</div>
         </div>
         <div class="traffic-bar-bg">
-          <div id="mobileBarFill" class="traffic-bar-fill" style="width:50%;background:var(--accent)"></div>
-          <div id="desktopBarFill" class="traffic-bar-fill" style="width:50%;background:var(--accent2)"></div>
+          <div id="mobileBarFill" class="traffic-bar-fill" style="width:50%;background:var(--primary)"></div>
+          <div id="desktopBarFill" class="traffic-bar-fill" style="width:50%;background:var(--accent-cyan)"></div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-header">
           <h3>📊 Real-Time Scan Activity Log</h3>
-          <div style="display:flex;gap:10px;align-items:center;">
-            <select id="analyticsFilterSlug" style="width:auto;padding:6px 12px;font-size:0.85rem;" onchange="renderAnalyticsLogs()">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <select id="analyticsFilterSlug" style="width:auto;padding:7px 14px;font-size:0.88rem;" onchange="renderAnalyticsLogs()">
               <option value="ALL">Filter: All Businesses</option>
             </select>
             <button class="btn btn-ghost btn-sm" onclick="exportAnalyticsCsv()">📥 Export CSV</button>
@@ -447,7 +573,7 @@
             <tr>
               <th>Time</th>
               <th>Date</th>
-              <th>Business</th>
+              <th>Business Slug</th>
               <th>Device</th>
               <th>Time of Day</th>
               <th>Review Engine Source</th>
@@ -458,22 +584,22 @@
       </div>
     </div>
 
-    <!-- ── BUSINESSES tab ──────────────────────────────────── -->
+    <!-- ── BUSINESSES TAB ───────────────────────────────────── -->
     <div id="tab-content-businesses" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div class="section-title" style="margin:0;font-weight:700;font-size:1.1rem">Registered Businesses (Disk DB Persistent)</div>
-        <div style="display:flex;gap:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+        <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:1.35rem">Registered Businesses (Turso Cloud DB Active)</div>
+        <div style="display:flex;gap:12px">
           <button class="btn btn-ghost btn-sm" onclick="exportDbJson()">📥 Backup DB</button>
           <button class="btn btn-success btn-sm" onclick="toggleAddForm()">+ Add New Business</button>
         </div>
       </div>
 
       <div class="add-form" id="addForm">
-        <div style="font-weight:600;margin-bottom:16px">➕ Add New Business (Zero Code Required · 100% DB Persistent!)</div>
+        <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:1.1rem;margin-bottom:18px">➕ Add New Business (Zero Code Required · 100% Cloud Persisted)</div>
         <div class="add-form-grid">
-          <div class="row"><label>Slug (unique ID, e.g. youngwear_fashions)</label><input id="new-slug" type="text" placeholder="e.g. youngwear_fashions"></div>
-          <div class="row"><label>Business Name</label><input id="new-name" type="text" placeholder="e.g. Youngwear Fashions"></div>
-          <div class="row"><label>Business Category / Type</label>
+          <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Slug (unique ID, e.g. youngwear_fashions)</label><input id="new-slug" type="text" placeholder="e.g. youngwear_fashions"></div>
+          <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Business Name</label><input id="new-name" type="text" placeholder="e.g. Youngwear Fashions"></div>
+          <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Business Category / Type</label>
             <select id="new-type" onchange="toggleCustomCategoryInput('new')">
               <option value="clothing store">Clothing Store / Fashion</option>
               <option value="saloon">Saloon / Hair Care</option>
@@ -488,7 +614,7 @@
             </select>
             <input id="new-type-custom" type="text" placeholder="Type custom category e.g. Bakery" style="display:none;margin-top:8px">
           </div>
-          <div class="row"><label>Target Review Language</label>
+          <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Target Review Language</label>
             <select id="new-lang">
               <option value="English">🇺🇸 English</option>
               <option value="Spanish">🇪🇸 Spanish</option>
@@ -498,44 +624,44 @@
               <option value="Arabic">🇦🇪 Arabic</option>
             </select>
           </div>
-          <div class="row" style="grid-column: span 2"><label>Google Review Link</label><input id="new-google" type="url" placeholder="https://search.google.com/local/writereview?placeid=YOUR_ID"></div>
-          <div class="row" style="grid-column: span 2"><label>Gemini API Key (Optional — overrides global key for this business)</label><input id="new-apikey" type="text" placeholder="AQ.Ab8RN6… (Leave empty to use global key)"></div>
+          <div style="grid-column: span 2"><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Google Review Link</label><input id="new-google" type="url" placeholder="https://search.google.com/local/writereview?placeid=YOUR_ID"></div>
+          <div style="grid-column: span 2"><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Gemini API Key (Optional — overrides global key for this business)</label><input id="new-apikey" type="text" placeholder="AQ.Ab8RN6… (Leave empty to use global key)"></div>
         </div>
-        <div style="display:flex;gap:10px;margin-top:16px">
-          <button class="btn btn-primary btn-sm" onclick="addBusiness()">Save & Permanently Persist Business</button>
+        <div style="display:flex;gap:12px;margin-top:20px">
+          <button class="btn btn-primary btn-sm" onclick="addBusiness()">Save & Persist Business</button>
           <button class="btn btn-ghost btn-sm" onclick="toggleAddForm()">Cancel</button>
         </div>
       </div>
 
       <div class="biz-grid" id="bizGrid">
-        <div class="empty">Loading…</div>
+        <div class="empty" style="padding:40px;color:var(--muted)">Loading registered businesses…</div>
       </div>
     </div>
 
-    <!-- ── SETTINGS tab ─────────────────────────────────────── -->
+    <!-- ── SETTINGS TAB ─────────────────────────────────────── -->
     <div id="tab-content-settings" style="display:none">
       <div class="card">
-        <div class="card-header"><h3>🔑 API Keys</h3></div>
-        <div class="settings-row">
-          <label>Gemini API Key (global — active on backend)</label>
+        <div class="card-header"><h3>🔑 Global API Keys</h3></div>
+        <div style="margin-bottom:20px;">
+          <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">Global Gemini API Key</label>
           <input id="geminiKeyInput" type="text" placeholder="AQ.Ab8RN6…">
         </div>
-        <div class="settings-row">
-          <label>Admin API Key (used to access this panel — default: Lucky@000)</label>
+        <div style="margin-bottom:20px;">
+          <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">Admin API Key (Default: Lucky@000)</label>
           <input id="adminKeyInput" type="password" placeholder="Current key: Lucky@000">
         </div>
-        <div style="font-size:0.78rem;color:var(--warn);margin-bottom:16px">
-          ⚠️ Saving here updates in-memory instantly. Go to <strong>Render Dashboard → Environment</strong> to persist changes permanently.
+        <div style="font-size:0.84rem;color:var(--warning);margin-bottom:20px">
+          ⚡ Saving here updates and persists your API keys directly into <strong>Turso Cloud Database</strong> (<code>app_settings</code> table).
         </div>
-        <button class="btn btn-success btn-sm" onclick="saveSettings()">Save Keys</button>
+        <button class="btn btn-success btn-sm" onclick="saveSettings()">Save & Persist API Keys</button>
       </div>
 
       <div class="card">
-        <div class="card-header"><h3>💾 Turbo Disk Database Backup & Restore</h3></div>
-        <div style="font-size:0.88rem;color:var(--muted);margin-bottom:16px">
-          All businesses, Google Review links, API keys, and settings are saved to <code>backend/db/businesses.json</code> on disk. You can download a backup copy or restore your database in 1 click!
+        <div class="card-header"><h3>☁️ Turso Cloud Database Backup & Restore</h3></div>
+        <div style="font-size:0.9rem;color:var(--muted);margin-bottom:20px;line-height:1.6">
+          All businesses, Google Review links, API keys, and settings are saved to <strong>Turso Cloud SQLite Database</strong> (<code>libsql://scan-qr-db-rithesh.aws-ap-south-1.turso.io</code>). You can download a backup copy or restore your database in 1 click!
         </div>
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="exportDbJson()">📥 Backup Database (JSON)</button>
           <label class="btn btn-ghost btn-sm" style="cursor:pointer">
             📤 Restore Database (JSON)
@@ -545,7 +671,7 @@
       </div>
     </div>
 
-  </div><!-- /content -->
+  </div><!-- /content-area -->
 </div><!-- /app -->
 
 <!-- ── AI Review Test Modal ────────────────────────────────────── -->
@@ -564,10 +690,10 @@
   <div class="modal">
     <h3>✏️ Edit Business Settings</h3>
     <input type="hidden" id="edit-slug">
-    <div style="display:grid;gap:14px;margin-top:14px;">
-      <div><label style="font-size:0.8rem;color:var(--muted);">Business Slug</label><input id="edit-slug-display" type="text" disabled style="opacity:0.6"></div>
-      <div><label style="font-size:0.8rem;color:var(--muted);">Business Name</label><input id="edit-name" type="text"></div>
-      <div><label style="font-size:0.8rem;color:var(--muted);">Category / Type</label>
+    <div style="display:grid;gap:16px;margin-top:16px;">
+      <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Business Slug</label><input id="edit-slug-display" type="text" disabled style="opacity:0.6"></div>
+      <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Business Name</label><input id="edit-name" type="text"></div>
+      <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Category / Type</label>
         <select id="edit-type" onchange="toggleCustomCategoryInput('edit')">
           <option value="clothing store">Clothing Store / Fashion</option>
           <option value="saloon">Saloon / Hair Care</option>
@@ -582,7 +708,7 @@
         </select>
         <input id="edit-type-custom" type="text" placeholder="Type custom category e.g. Bakery" style="display:none;margin-top:8px">
       </div>
-      <div><label style="font-size:0.8rem;color:var(--muted);">Target Review Language</label>
+      <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Target Review Language</label>
         <select id="edit-lang">
           <option value="English">🇺🇸 English</option>
           <option value="Spanish">🇪🇸 Spanish</option>
@@ -592,8 +718,8 @@
           <option value="Arabic">🇦🇪 Arabic</option>
         </select>
       </div>
-      <div><label style="font-size:0.8rem;color:var(--muted);">Google Review Link</label><input id="edit-google" type="url"></div>
-      <div><label style="font-size:0.8rem;color:var(--muted);">Gemini API Key (Optional — overrides global key)</label><input id="edit-apikey" type="text" placeholder="AQ.Ab8RN6… (Leave empty to use global key)"></div>
+      <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Google Review Link</label><input id="edit-google" type="url"></div>
+      <div><label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:6px">Gemini API Key (Optional — overrides global key)</label><input id="edit-apikey" type="text" placeholder="AQ.Ab8RN6… (Leave empty to use global key)"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeEditModal()">Cancel</button>
@@ -605,16 +731,16 @@
 <!-- ── Printable Counter Stand Modal ───────────────────────────── -->
 <div class="modal-overlay" id="printModal" onclick="if(event.target===this)closePrintModal()">
   <div class="modal" style="width:min(100% - 32px, 480px);background:#fff;color:#000;">
-    <div id="printableStand" style="text-align:center;padding:20px;">
-      <div id="printIcon" style="font-size:2.8rem;margin-bottom:8px">💇‍♀️</div>
-      <h2 id="printTitle" style="font-size:1.4rem;font-weight:800;margin-bottom:6px">Royal Saloon & Spa</h2>
-      <p style="font-size:0.9rem;color:#555;margin-bottom:20px">Scan to Leave a 5-Star Google Review!</p>
+    <div id="printableStand" style="text-align:center;padding:24px;">
+      <div id="printIcon" style="font-size:3rem;margin-bottom:10px">💇‍♀️</div>
+      <h2 id="printTitle" style="font-size:1.5rem;font-weight:800;margin-bottom:8px">Royal Saloon & Spa</h2>
+      <p style="font-size:0.95rem;color:#555;margin-bottom:24px">Scan to Leave a 5-Star Google Review!</p>
 
-      <div id="printQrContainer" style="display:inline-block;padding:16px;border:2px dashed #ccc;border-radius:16px;margin-bottom:16px"></div>
+      <div id="printQrContainer" style="display:inline-block;padding:18px;border:2px dashed #ccc;border-radius:18px;margin-bottom:20px"></div>
 
-      <div style="font-size:0.82rem;color:#777;">⭐ Automatic 5-Star Review Copied & Redirected ⭐</div>
+      <div style="font-size:0.85rem;color:#777;font-weight:600">⭐ Automatic 5-Star Review Copied & Redirected ⭐</div>
     </div>
-    <div class="modal-footer" style="border-top:1px solid #eee;padding-top:14px">
+    <div class="modal-footer" style="border-top:1px solid #eee;padding-top:16px">
       <button class="btn btn-ghost" onclick="closePrintModal()">Close</button>
       <button class="btn btn-primary" onclick="window.print()">🖨️ Print Now</button>
     </div>
@@ -673,7 +799,7 @@
     if (enabled) {
       toast('Auto-refresh enabled (every 10s)', 'success');
       autoTimer = setInterval(() => {
-        const activeTab = document.querySelector('.tab.active');
+        const activeTab = document.querySelector('.tab-item.active');
         if (activeTab) {
           const id = activeTab.id.replace('tab-', '');
           if (id === 'status') loadStatus();
@@ -686,7 +812,7 @@
     }
   }
 
-  // ── API helper ──────────────────────────────────────────────────────────────
+  // ── API Helper ──────────────────────────────────────────────────────────────
   async function api(path, opts = {}) {
     const { method = 'GET', body, key } = opts;
     const r = await fetch(BASE + path, {
@@ -707,7 +833,7 @@
 
   // ── Tabs ────────────────────────────────────────────────────────────────────
   function switchTab(name, el) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
     ['status','qrstudio','queue','analytics','businesses','settings'].forEach(t => {
       document.getElementById(`tab-content-${t}`).style.display = t === name ? '' : 'none';
@@ -720,7 +846,7 @@
     if (name === 'settings')    loadSettings();
   }
 
-  // ── STATUS tab ──────────────────────────────────────────────────────────────
+  // ── STATUS TAB ──────────────────────────────────────────────────────────────
   async function loadStatus() {
     document.getElementById('loadingSpinner').style.display = 'block';
     document.getElementById('statusBody').innerHTML = '';
@@ -729,38 +855,37 @@
       const data = await apiJSON('/admin/api/status');
 
       const totalSites = data.sites.length;
-      const upSites    = data.sites.filter(s => s.status === 'up').length;
       document.getElementById('statsRow').innerHTML = `
-        <div class="stat-card"><div class="stat-label">Backend</div><div class="stat-value up">Online</div></div>
+        <div class="stat-card"><div class="stat-label">Backend Status</div><div class="stat-value up">Online</div></div>
         <div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-value accent">${fmtUptime(data.backend.uptimeSeconds)}</div></div>
         <div class="stat-card"><div class="stat-label">Active Businesses</div><div class="stat-value up">${totalSites} Active</div></div>
-        <div class="stat-card"><div class="stat-label">Gemini AI</div><div class="stat-value ${data.geminiConfigured ? 'up' : ''}" style="${data.geminiConfigured ? '' : 'color:var(--warn)'}">${data.geminiConfigured ? 'Configured' : 'Not Set'}</div></div>
+        <div class="stat-card"><div class="stat-label">Turso Cloud DB</div><div class="stat-value ${data.tursoConnected ? 'up' : ''}">${data.tursoConnected ? 'Active' : 'Offline'}</div></div>
       `;
 
       const tbody = document.getElementById('statusBody');
       if (!data.sites.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty">No businesses registered yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted)">No businesses registered yet.</td></tr>';
       } else {
         tbody.innerHTML = data.sites.map(s => `
           <tr>
-            <td>${s.name || s.slug}</td>
-            <td><code style="font-size:0.78rem;color:var(--accent)">${s.slug}</code></td>
-            <td>${s.url ? `<a href="${s.url}" target="_blank" style="color:var(--accent2)">${s.url}</a>` : '<span style="color:var(--muted)">—</span>'}</td>
+            <td><strong>${s.name || s.slug}</strong></td>
+            <td><code style="font-size:0.82rem;color:var(--primary)">${s.slug}</code></td>
+            <td>${s.url ? `<a href="${s.url}" target="_blank" style="color:var(--accent-cyan);text-decoration:none">${s.url}</a>` : '<span style="color:var(--muted)">—</span>'}</td>
             <td>${statusBadge(s)}</td>
             <td>${s.latencyMs != null ? `<span style="color:var(--muted)">${s.latencyMs}ms</span>` : '—'}</td>
           </tr>
         `).join('');
       }
     } catch (err) {
-      document.getElementById('backendBadge').textContent = '● Backend Offline';
-      document.getElementById('backendBadge').style.background = 'rgba(239,68,68,.15)';
-      document.getElementById('backendBadge').style.color = 'var(--down)';
+      document.getElementById('backendBadge').innerHTML = '● Backend Offline';
+      document.getElementById('backendBadge').style.background = 'rgba(244, 63, 94, 0.15)';
+      document.getElementById('backendBadge').style.color = 'var(--danger)';
     }
 
     document.getElementById('loadingSpinner').style.display = 'none';
   }
 
-  // ── QR STUDIO tab ───────────────────────────────────────────────────────────
+  // ── QR STUDIO TAB ───────────────────────────────────────────────────────────
   async function loadQrStudio() {
     try {
       const list = await apiJSON('/admin/api/businesses');
@@ -793,7 +918,7 @@
 
     document.getElementById('qrTargetUrl').value = targetUrl;
 
-    const darkColor  = document.getElementById('qrDarkColor').value || '#6c63ff';
+    const darkColor  = document.getElementById('qrDarkColor').value || '#6366f1';
     const lightColor = document.getElementById('qrLightColor').value || '#ffffff';
 
     const container = document.getElementById('qrCanvasContainer');
@@ -852,7 +977,7 @@
     document.getElementById('printModal').classList.remove('open');
   }
 
-  // ── QUEUE INSPECTOR tab ─────────────────────────────────────────────────────
+  // ── QUEUE INSPECTOR TAB ─────────────────────────────────────────────────────
   async function loadQueueInspector() {
     try {
       const list = await apiJSON('/admin/api/businesses');
@@ -866,7 +991,7 @@
 
       const slug = select.value || 'saloon';
       const container = document.getElementById('queueItemsContainer');
-      container.innerHTML = '<div class="empty">Loading active queue buffer…</div>';
+      container.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted)">Loading active queue buffer…</div>';
 
       const data = await apiJSON(`/admin/api/queue/${slug}`);
 
@@ -874,21 +999,21 @@
         `Active Queue Buffer for "${slug}": ${data.queueLength} / ${data.maxSize} items ready for instant 0ms pop`;
 
       if (!data.items.length) {
-        container.innerHTML = '<div class="empty">Queue is empty right now.</div>';
+        container.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted)">Queue is empty right now.</div>';
         return;
       }
 
       container.innerHTML = data.items.map(item => `
-        <div class="queue-box">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
             <span class="badge ${item.generated ? 'badge-ai' : 'badge-up'}">Position #${item.position} · ${item.source}</span>
-            <span style="font-size:0.75rem;color:var(--muted)">Added: ${item.timestamp}</span>
+            <span style="font-size:0.78rem;color:var(--muted)">Added: ${item.timestamp}</span>
           </div>
-          <div style="font-size:0.92rem;line-height:1.5;">"${item.review}"</div>
+          <div style="font-size:0.95rem;line-height:1.55;">"${item.review}"</div>
         </div>
       `).join('');
     } catch (err) {
-      document.getElementById('queueItemsContainer').innerHTML = `<div class="empty">Error loading queue: ${err.message}</div>`;
+      document.getElementById('queueItemsContainer').innerHTML = `<div style="padding:30px;text-align:center;color:var(--danger)">Error loading queue: ${err.message}</div>`;
     }
   }
 
@@ -916,7 +1041,7 @@
     }
   }
 
-  // ── ANALYTICS tab ──────────────────────────────────────────────────────────
+  // ── ANALYTICS TAB ──────────────────────────────────────────────────────────
   async function loadAnalytics() {
     try {
       const data = await apiJSON('/admin/api/analytics');
@@ -958,13 +1083,13 @@
     const tbody = document.getElementById('analyticsLogBody');
 
     if (!logs.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty">No scan activity logged for this filter.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">No scan activity logged for this filter.</td></tr>';
     } else {
       tbody.innerHTML = logs.map(l => `
         <tr>
           <td>${l.timestamp}</td>
           <td>${l.date}</td>
-          <td><code style="font-size:0.78rem;color:var(--accent)">${l.slug}</code></td>
+          <td><code style="font-size:0.82rem;color:var(--primary)">${l.slug}</code></td>
           <td>${l.deviceType}</td>
           <td>${l.timeOfDay}</td>
           <td><span class="badge badge-ai">${l.source}</span></td>
@@ -990,8 +1115,8 @@
   }
 
   function statusBadge(s) {
-    if (s.status === 'up')     return `<span class="badge badge-up"><span class="dot dot-up"></span>Online</span>`;
-    if (s.status === 'down')   return `<span class="badge badge-down"><span class="dot dot-down"></span>Down</span>`;
+    if (s.status === 'up')     return `<span class="badge badge-up"><span class="pulse-dot"></span>Online</span>`;
+    if (s.status === 'down')   return `<span class="badge badge-down">Down</span>`;
     if (s.status === 'error')  return `<span class="badge badge-down">HTTP ${s.httpStatus}</span>`;
     return `<span class="badge badge-nourl">No URL</span>`;
   }
@@ -1030,17 +1155,17 @@
     reader.readAsText(file);
   }
 
-  // ── BUSINESSES tab ──────────────────────────────────────────────────────────
+  // ── BUSINESSES TAB ──────────────────────────────────────────────────────────
   async function loadBusinesses() {
     const grid = document.getElementById('bizGrid');
-    grid.innerHTML = '<div class="empty">Loading…</div>';
+    grid.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)">Loading registered businesses…</div>';
     try {
       const list = await apiJSON('/admin/api/businesses');
-      if (!list.length) { grid.innerHTML = '<div class="empty">No businesses yet. Click + Add New Business.</div>'; return; }
+      if (!list.length) { grid.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)">No businesses registered yet. Click + Add New Business.</div>'; return; }
       grid.innerHTML = list.map(b => {
         const siteUrl = b.siteUrl || `https://scanqr-beta.vercel.app?biz=${b.slug}`;
-        const keyBadge = b.hasCustomApiKey ? `<span class="badge badge-up" style="font-size:0.72rem">🔑 Custom Key: ${b.maskedApiKey}</span>` : `<span class="badge badge-nourl" style="font-size:0.72rem">🌐 Global Key</span>`;
-        const langBadge = `<span class="badge badge-ai" style="font-size:0.72rem">🌐 ${b.language || 'English'}</span>`;
+        const keyBadge = b.hasCustomApiKey ? `<span class="badge badge-up" style="font-size:0.75rem">🔑 Custom Key: ${b.maskedApiKey}</span>` : `<span class="badge badge-nourl" style="font-size:0.75rem">🌐 Global Key</span>`;
+        const langBadge = `<span class="badge badge-ai" style="font-size:0.75rem">🌐 ${b.language || 'English'}</span>`;
 
         return `
         <div class="biz-card">
@@ -1049,26 +1174,26 @@
               <div class="biz-name">${b.name || b.slug}</div>
               <div class="biz-slug">slug: <code>${b.slug}</code> · type: <strong>${b.type || 'business'}</strong></div>
             </div>
-            <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+            <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
               ${keyBadge}
               ${langBadge}
             </div>
           </div>
-          ${b.googleReviewLink ? `<div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔗 ${b.googleReviewLink}</div>` : ''}
-          <div style="font-size:0.8rem;color:var(--accent2);background:var(--bg);padding:6px 10px;border-radius:6px;border:1px solid var(--border);margin-bottom:12px;word-break:break-all">
-            🌐 Vercel URL: <a href="${siteUrl}" target="_blank" style="color:var(--accent2);font-weight:600">${siteUrl}</a>
+          ${b.googleReviewLink ? `<div style="font-size:0.8rem;color:var(--muted);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔗 ${b.googleReviewLink}</div>` : ''}
+          <div style="font-size:0.82rem;color:var(--accent-cyan);background:var(--bg);padding:8px 12px;border-radius:8px;border:1px solid var(--border);margin-bottom:14px;word-break:break-all">
+            🌐 Vercel Link: <a href="${siteUrl}" target="_blank" style="color:var(--accent-cyan);font-weight:600;text-decoration:none">${siteUrl}</a>
           </div>
           <div class="biz-actions">
             <button class="btn btn-success btn-sm" onclick="testReview('${b.slug}')">⚡ Test Gemini AI</button>
             <button class="btn btn-ghost btn-sm" onclick="openEditModal('${b.slug}','${escapeHtml(b.name || '')}','${escapeHtml(b.type || '')}','${escapeHtml(b.googleReviewLink || '')}','${escapeHtml(b.language || 'English')}','${escapeHtml(b.geminiApiKey || '')}')">✏️ Edit</button>
-            ${b.googleReviewLink ? `<a href="${b.googleReviewLink}" target="_blank" class="btn btn-ghost btn-sm" style="color:var(--accent2);text-decoration:none">🔗 Test Google Link</a>` : ''}
-            <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${siteUrl}');toast('Vercel URL Copied!','success')">📋 Copy URL</button>
+            ${b.googleReviewLink ? `<a href="${b.googleReviewLink}" target="_blank" class="btn btn-ghost btn-sm" style="color:var(--accent-cyan);text-decoration:none">🔗 Test Google Link</a>` : ''}
+            <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${siteUrl}');toast('Vercel URL Copied!','success')">📋 Copy Link</button>
             <button class="btn btn-danger btn-sm" onclick="deleteBusiness('${b.slug}')">🗑️ Delete</button>
           </div>
         </div>
       `}).join('');
     } catch (err) {
-      grid.innerHTML = `<div class="empty">Error: ${err.message}</div>`;
+      grid.innerHTML = `<div style="padding:40px;text-align:center;color:var(--danger)">Error loading businesses: ${err.message}</div>`;
     }
   }
 
@@ -1104,7 +1229,7 @@
 
     const r = await api(`/admin/api/config/${slug}`, { method: 'POST', body });
     if (r.ok) {
-      toast(`Business "${body.name}" Added & Permanently Persisted!`, 'success');
+      toast(`Business "${body.name}" Added & Persisted to Turso Cloud DB!`, 'success');
       document.getElementById('addForm').classList.remove('open');
       loadBusinesses();
     } else {
@@ -1154,7 +1279,7 @@
 
     const r = await api(`/admin/api/config/${slug}`, { method: 'POST', body });
     if (r.ok) {
-      toast(`Business "${body.name}" Updated & Persisted!`, 'success');
+      toast(`Business "${body.name}" Updated & Persisted to Turso Cloud DB!`, 'success');
       closeEditModal();
       loadBusinesses();
     } else {
@@ -1166,7 +1291,7 @@
     if (!confirm(`Are you sure you want to delete business "${slug}"?`)) return;
     const r = await api(`/admin/api/config/${slug}`, { method: 'DELETE' });
     if (r.ok) {
-      toast(`Business "${slug}" deleted from disk DB!`, 'success');
+      toast(`Business "${slug}" deleted from Turso Cloud DB!`, 'success');
       loadBusinesses();
     } else {
       toast('Failed to delete business', 'error');
@@ -1177,7 +1302,7 @@
   async function testReview(slug) {
     document.getElementById('aiTestModal').classList.add('open');
     document.getElementById('aiModalContent').innerHTML = `
-      <div style="text-align:center;padding:20px;color:var(--muted);">
+      <div style="text-align:center;padding:24px;color:var(--muted);">
         ⚡ Calling Gemini AI model for business "<strong>${slug}</strong>"…
       </div>
     `;
@@ -1188,27 +1313,27 @@
 
       if (r.ok && data.generated) {
         document.getElementById('aiModalContent').innerHTML = `
-          <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;">
-            <div style="font-size:1.02rem;line-height:1.55;color:var(--text);margin-bottom:14px;">"${data.review}"</div>
-            <div style="display:flex;gap:12px;font-size:0.8rem;color:var(--muted);border-top:1px solid var(--border);padding-top:12px;flex-wrap:wrap">
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:18px;">
+            <div style="font-size:1.05rem;line-height:1.6;color:var(--text);margin-bottom:16px;">"${data.review}"</div>
+            <div style="display:flex;gap:14px;font-size:0.82rem;color:var(--muted);border-top:1px solid var(--border);padding-top:14px;flex-wrap:wrap">
               <span>🌐 Lang: <strong>${data.language || 'English'}</strong></span>
               <span>🤖 Model: <strong>${data.modelUsed}</strong></span>
               <span>⚡ Latency: <strong>${data.latencyMs}ms</strong></span>
               <span>📝 Words: <strong>${data.wordCount}</strong></span>
             </div>
           </div>
-          <div style="font-size:0.82rem;color:var(--up);">✅ Gemini AI generation successful for business "${slug}"!</div>
+          <div style="font-size:0.85rem;color:var(--success);font-weight:600">✅ Gemini AI generation successful for business "${slug}"!</div>
         `;
       } else {
         document.getElementById('aiModalContent').innerHTML = `
-          <div style="color:var(--danger);font-size:0.9rem;line-height:1.5;">
+          <div style="color:var(--danger);font-size:0.92rem;line-height:1.5;">
             ❌ Gemini AI Error: ${data.error || 'Failed to generate review. Check Gemini API key in Settings.'}
           </div>
         `;
       }
     } catch (err) {
       document.getElementById('aiModalContent').innerHTML = `
-        <div style="color:var(--danger);font-size:0.9rem;">
+        <div style="color:var(--danger);font-size:0.92rem;">
           ❌ Network Error: ${err.message}
         </div>
       `;
@@ -1219,7 +1344,7 @@
     document.getElementById('aiTestModal').classList.remove('open');
   }
 
-  // ── SETTINGS tab ─────────────────────────────────────────────────────────────
+  // ── SETTINGS TAB ─────────────────────────────────────────────────────────────
   async function loadSettings() {
     try {
       const data = await apiJSON('/admin/api/settings');
@@ -1241,9 +1366,9 @@
         API_KEY = newAdminKey;
         localStorage.setItem('scanqr_admin_key', newAdminKey);
       }
-      toast('Keys updated in-memory & Auth updated! Update Render env vars to persist.', 'success');
+      toast('API Keys saved and persisted into Turso Cloud DB!', 'success');
     } else {
-      toast('Failed to save', 'error');
+      toast('Failed to save settings', 'error');
     }
   }
 
