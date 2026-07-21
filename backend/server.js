@@ -642,7 +642,7 @@ app.get('/health', (req, res) => {
   }
 
   // Business bank sizes from in-memory configs
-  const bizSlugs = Object.keys(bizConfigs || {});
+  const bizSlugs = Object.keys(dbStore || {});
 
   res.json({
     status: 'ok',
@@ -1047,7 +1047,7 @@ app.get('/admin/api/status', adminAuth, async (req, res) => {
   });
 });
 
-app.get('/admin', (req, res) => {
+app.get(['/admin', '/admin.html'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
