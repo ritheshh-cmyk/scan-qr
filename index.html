@@ -96,14 +96,14 @@
     // ── UNIVERSAL CATEGORY ICONS ───────────────────────────────────────────────
     function getCategoryIcon(type) {
       const t = (type || '').toLowerCase();
-      if (t.includes('clothing') || t.includes('fashion') || t.includes('apparel')) return '👗';
-      if (t.includes('saloon') || t.includes('salon') || t.includes('hair')) return '💇‍♀️';
-      if (t.includes('barber')) return '💈';
+      if (t.includes('mandi')) return '🍗';
+      if (t.includes('saloon') || t.includes('barber')) return '💈';
+      if (t.includes('salon') || t.includes('hair') || t.includes('beauty')) return '💇‍♀️';
       if (t.includes('spa') || t.includes('massage')) return '🧖‍♀️';
-      if (t.includes('food') || t.includes('restaurant') || t.includes('pizza')) return '🍕';
-      if (t.includes('cafe') || t.includes('coffee')) return '☕';
-      if (t.includes('dental') || t.includes('doctor')) return '🦷';
-      if (t.includes('gym') || t.includes('fitness')) return '🏋️‍♂️';
+      if (t.includes('cafe') || t.includes('coffee') || t.includes('bakery')) return '☕';
+      if (t.includes('food') || t.includes('restaurant') || t.includes('dining')) return '🍽️';
+      if (t.includes('clothing') || t.includes('fashion') || t.includes('wear') || t.includes('boutique')) return '👗';
+      if (t.includes('gym') || t.includes('fitness') || t.includes('workout')) return '💪';
       return '🛍️';
     }
 
@@ -141,34 +141,64 @@
 
     let activeReview = generateUniqueReview();
     let redirected   = false;
+    let redirectAttempted = false;
 
-    // ── COPY CLIPBOARD (Instant) ────────────────────────────────────────────────
-    function copyInstantly(text) {
+    // ── ASYNC COPY CLIPBOARD ENGINE (With gesture fallback check) ───────────────
+    async function copyReviewToClipboard(text) {
+      // 1. Try modern clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (e) {
+          // Fallback
+        }
+      }
+
+      // 2. Try legacy input selection method
       try {
-        navigator.clipboard.writeText(text);
-      } catch {
         const ta = document.createElement('textarea');
         ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
         document.body.appendChild(ta);
         ta.select();
-        document.execCommand('copy');
+        ta.setSelectionRange(0, 99999); // Safe for mobile Safari/Chrome
+        const success = document.execCommand('copy');
         document.body.removeChild(ta);
+        if (success) return true;
+      } catch (err) {
+        // Fail
+      }
+
+      return false;
+    }
+
+    // ── SMART REDIRECT ENGINE ──────────────────────────────────────────────────
+    async function attemptRedirect(isUserClicked) {
+      if (redirected) return;
+
+      const copied = await copyReviewToClipboard(activeReview);
+
+      if (copied || isUserClicked) {
+        redirected = true;
+        window.location.href = googleReviewLink;
+      } else {
+        // Copy failed because browser blocked writing without user gesture
+        if (!redirectAttempted) {
+          redirectAttempted = true;
+          document.getElementById('heading').textContent = "Tap to Copy & Continue";
+          document.querySelector('.subtext').textContent = "Review copied! Tap below to open Google Reviews.";
+          const mainBtn = document.getElementById('mainBtn');
+          mainBtn.textContent = "Tap to Copy & Continue 🚀";
+          mainBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
+          mainBtn.style.boxShadow = "0 10px 24px rgba(16, 185, 129, 0.4)";
+        }
       }
     }
 
-    // ── INSTANT REDIRECT ENGINE ────────────────────────────────────────────────
-    function doRedirect() {
-      if (redirected) return;
-      redirected = true;
-
-      copyInstantly(activeReview);
-
-      // Instant redirect
-      window.location.href = googleReviewLink;
-    }
-
     function handleTap() {
-      doRedirect();
+      attemptRedirect(true);
     }
 
     // ── DYNAMICALLY LOAD BUSINESS CONFIG & REVIEW IN PARALLEL ──────────────────
@@ -191,13 +221,13 @@
       if (revData && revData.review) {
         activeReview = revData.review;
       }
-      doRedirect();
+      attemptRedirect(false);
     }).catch(() => {
-      doRedirect();
+      attemptRedirect(false);
     });
 
     // ── SAFETY FALLBACK TIMER (1500ms max in case of network latency) ──────────
-    setTimeout(doRedirect, 1500);
+    setTimeout(() => attemptRedirect(false), 1500);
   </script>
 </body>
 </html>
