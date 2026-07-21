@@ -237,7 +237,7 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
 
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
-  const randomSeed      = `${Date.now()}_${Math.floor(Math.random() * 999999)}_${meta.ip}`;
+  const randomSeed      = `${Date.now()}_${Math.floor(Math.random() * 999999)}_${meta.ip || 'admin'}`;
 
   const fullPrompt =
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
@@ -266,7 +266,7 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
       review: reviewText,
       generated: true,
       source: `gemini-high-entropy (${modelUsed})`,
-      meta: { deviceType: meta.deviceType, persona: selectedPersona, modelUsed },
+      meta: { deviceType: meta.deviceType || 'Smartphone', persona: selectedPersona, modelUsed },
       timestamp: Date.now()
     });
 
@@ -416,6 +416,22 @@ app.get('/admin/api/queue/:slug', adminAuth, (req, res) => {
   });
 });
 
+// Flush Queue for a business
+app.post('/admin/api/queue/:slug/clear', adminAuth, (req, res) => {
+  const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
+  reviewQueues[cleanSlug] = [];
+  res.json({ success: true, message: `Queue for business '${cleanSlug}' cleared successfully.` });
+});
+
+// Force Generate AI Review into Queue
+app.post('/admin/api/queue/:slug/generate', adminAuth, async (req, res) => {
+  const cleanSlug  = sanitizeSlug(req.params.slug) || 'saloon';
+  const clientMeta = getClientMetadata(req);
+  await generateAndEnqueueReview(cleanSlug, clientMeta);
+  const q = reviewQueues[cleanSlug] || [];
+  res.json({ success: true, message: `Triggered AI generation for '${cleanSlug}'. Current queue length: ${q.length}` });
+});
+
 // ── ADMIN: Analytics API ───────────────────────────────────────────────────────
 app.get('/admin/api/analytics', adminAuth, (req, res) => {
   res.json({
@@ -426,6 +442,16 @@ app.get('/admin/api/analytics', adminAuth, (req, res) => {
     sourceStats: analyticsStore.sourceStats,
     logs: analyticsStore.logs
   });
+});
+
+app.delete('/admin/api/analytics/clear', adminAuth, (req, res) => {
+  analyticsStore.totalScans = 0;
+  analyticsStore.uniqueIps.clear();
+  analyticsStore.deviceStats = { Smartphone: 0, Desktop: 0 };
+  analyticsStore.timeStats = { Morning: 0, Afternoon: 0, Evening: 0 };
+  analyticsStore.sourceStats = { 'Gemini AI Queue': 0, 'Initial Seed Queue': 0, 'Instant Fallback': 0 };
+  analyticsStore.logs = [];
+  res.json({ success: true, message: 'Analytics history cleared successfully.' });
 });
 
 // ── ADMIN: Settings API ────────────────────────────────────────────────────────
@@ -470,10 +496,21 @@ app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
 
   process.env[`BIZ_${cleanSlug}`] = JSON.stringify(req.body);
   
-  // Re-seed queue for newly added business immediately
+  // Re-seed queue for newly added or updated business immediately
   seedQueueIfEmpty(cleanSlug, req.body);
 
   res.json({ success: true, config: req.body });
+});
+
+app.delete('/admin/api/config/:slug', adminAuth, (req, res) => {
+  const cleanSlug = sanitizeSlug(req.params.slug);
+  
+  // Delete from env and review queue
+  delete process.env[`BIZ_${cleanSlug}`];
+  delete reviewQueues[cleanSlug];
+  delete recentReviews[cleanSlug];
+
+  res.json({ success: true, message: `Business '${cleanSlug}' deleted successfully.` });
 });
 
 app.get('/admin/api/status', adminAuth, async (req, res) => {
@@ -529,5 +566,5 @@ Object.keys(DEFAULT_BUSINESSES).forEach(slug => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v9.1 (No Repetitive 10/10) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v10.0 (Enterprise Admin Suite) running on port ${PORT}`);
 });

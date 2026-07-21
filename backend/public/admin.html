@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ScanQR Admin Panel</title>
+<title>ScanQR Admin Suite v10.0</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -117,6 +117,20 @@
     border: 1px solid rgba(34, 197, 94, 0.3);
   }
 
+  .auto-refresh-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: var(--muted);
+    user-select: none;
+    cursor: pointer;
+    background: var(--bg);
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
   .tabs {
     display: flex;
     gap: 4px;
@@ -189,7 +203,7 @@
   .biz-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
   .biz-name { font-weight: 700; font-size: 1rem; }
   .biz-slug { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
-  .biz-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .biz-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 
   .status-table { width: 100%; border-collapse: collapse; }
   .status-table th, .status-table td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
@@ -251,6 +265,9 @@
   .key-display { font-family: monospace; background: var(--bg); padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; color: var(--accent2); border: 1px solid var(--border); word-break: break-all; }
   #loadingSpinner { display: none; text-align: center; padding: 40px; color: var(--muted); }
   .queue-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+  
+  .traffic-bar-bg { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; height: 12px; overflow: hidden; margin-top: 8px; display: flex; }
+  .traffic-bar-fill { height: 100%; transition: width 300ms ease; }
 </style>
 </head>
 <body>
@@ -259,7 +276,7 @@
 <div id="loginScreen">
   <div class="login-card">
     <div class="logo">⚡</div>
-    <h1>ScanQR Admin</h1>
+    <h1>ScanQR Admin Suite</h1>
     <p>Enter your admin API key to continue</p>
     <input id="apiKeyInput" type="password" placeholder="Default key: Lucky@000" style="margin-bottom:14px">
     <button class="btn btn-primary" onclick="login()">Sign In</button>
@@ -271,6 +288,10 @@
 <div id="app">
   <div class="topbar">
     <div class="brand">⚡ ScanQR Admin</div>
+    <label class="auto-refresh-toggle">
+      <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh(this.checked)">
+      ⏱️ Auto-Refresh (10s)
+    </label>
     <div class="spacer"></div>
     <span id="backendBadge" class="backend-badge">● Backend Online</span>
     <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
@@ -315,9 +336,11 @@
       <div class="card">
         <div class="card-header">
           <h3>📥 Live FIFO Queue Messages Inspector</h3>
-          <div style="display:flex;gap:10px;align-items:center;">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <select id="queueSlugSelect" style="width:auto;padding:6px 12px;font-size:0.85rem;" onchange="loadQueueInspector()"></select>
-            <button class="btn btn-ghost btn-sm" onclick="loadQueueInspector()">↻ Refresh Queue</button>
+            <button class="btn btn-ghost btn-sm" onclick="loadQueueInspector()">↻ Refresh</button>
+            <button class="btn btn-ghost btn-sm" onclick="forceGenerateAiForQueue()" style="color:var(--accent2)">⚡ Force-Generate AI</button>
+            <button class="btn btn-ghost btn-sm" onclick="flushQueue()" style="color:var(--danger)">🗑️ Flush Queue</button>
           </div>
         </div>
 
@@ -330,10 +353,27 @@
     <div id="tab-content-analytics" style="display:none">
       <div class="stats" id="analyticsStatsRow"></div>
 
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:0.88rem;font-weight:600">📱 Traffic Device Split</div>
+          <div id="deviceSplitText" style="font-size:0.82rem;color:var(--muted)">0% Smartphone · 0% Desktop</div>
+        </div>
+        <div class="traffic-bar-bg">
+          <div id="mobileBarFill" class="traffic-bar-fill" style="width:50%;background:var(--accent)"></div>
+          <div id="desktopBarFill" class="traffic-bar-fill" style="width:50%;background:var(--accent2)"></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <h3>📊 Real-Time Scan Activity Log</h3>
-          <button class="btn btn-ghost btn-sm" onclick="loadAnalytics()">↻ Refresh</button>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <select id="analyticsFilterSlug" style="width:auto;padding:6px 12px;font-size:0.85rem;" onchange="renderAnalyticsLogs()">
+              <option value="ALL">Filter: All Businesses</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="loadAnalytics()">↻ Refresh</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearAnalyticsHistory()" style="color:var(--danger)">🗑️ Clear Logs</button>
+          </div>
         </div>
         <table class="status-table">
           <thead>
@@ -354,7 +394,7 @@
     <!-- ── BUSINESSES tab ──────────────────────────────────── -->
     <div id="tab-content-businesses" style="display:none">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div class="section-title" style="margin:0">Registered Businesses</div>
+        <div class="section-title" style="margin:0;font-weight:700;font-size:1.1rem">Registered Businesses</div>
         <button class="btn btn-success btn-sm" onclick="toggleAddForm()">+ Add New Business</button>
       </div>
 
@@ -364,7 +404,7 @@
           <div class="row"><label>Slug (unique ID, e.g. youngwear_fashions)</label><input id="new-slug" type="text" placeholder="e.g. youngwear_fashions"></div>
           <div class="row"><label>Business Name</label><input id="new-name" type="text" placeholder="e.g. Youngwear Fashions"></div>
           <div class="row"><label>Business Category / Type</label>
-            <select id="new-type">
+            <select id="new-type" onchange="toggleCustomCategoryInput('new')">
               <option value="clothing store">Clothing Store / Fashion</option>
               <option value="saloon">Saloon / Hair Care</option>
               <option value="salon">Beauty Salon</option>
@@ -374,8 +414,9 @@
               <option value="cafe">Cafe / Coffee Shop</option>
               <option value="dental clinic">Dental / Medical Clinic</option>
               <option value="gym">Gym / Fitness Center</option>
-              <option value="custom">Custom Category</option>
+              <option value="custom">Custom Category…</option>
             </select>
+            <input id="new-type-custom" type="text" placeholder="Type custom category e.g. Bakery" style="display:none;margin-top:8px">
           </div>
           <div class="row"><label>Google Review Link</label><input id="new-google" type="url" placeholder="https://search.google.com/local/writereview?placeid=YOUR_ID"></div>
         </div>
@@ -423,11 +464,45 @@
   </div>
 </div>
 
+<!-- ── Edit Business Modal ─────────────────────────────────────── -->
+<div class="modal-overlay" id="editBusinessModal" onclick="if(event.target===this)closeEditModal()">
+  <div class="modal">
+    <h3>✏️ Edit Business Settings</h3>
+    <input type="hidden" id="edit-slug">
+    <div style="display:grid;gap:14px;margin-top:14px;">
+      <div><label style="font-size:0.8rem;color:var(--muted);">Business Slug</label><input id="edit-slug-display" type="text" disabled style="opacity:0.6"></div>
+      <div><label style="font-size:0.8rem;color:var(--muted);">Business Name</label><input id="edit-name" type="text"></div>
+      <div><label style="font-size:0.8rem;color:var(--muted);">Category / Type</label>
+        <select id="edit-type" onchange="toggleCustomCategoryInput('edit')">
+          <option value="clothing store">Clothing Store / Fashion</option>
+          <option value="saloon">Saloon / Hair Care</option>
+          <option value="salon">Beauty Salon</option>
+          <option value="barbershop">Barbershop</option>
+          <option value="spa">Spa & Wellness</option>
+          <option value="restaurant">Restaurant / Dining</option>
+          <option value="cafe">Cafe / Coffee Shop</option>
+          <option value="dental clinic">Dental / Medical Clinic</option>
+          <option value="gym">Gym / Fitness Center</option>
+          <option value="custom">Custom Category…</option>
+        </select>
+        <input id="edit-type-custom" type="text" placeholder="Type custom category e.g. Bakery" style="display:none;margin-top:8px">
+      </div>
+      <div><label style="font-size:0.8rem;color:var(--muted);">Google Review Link</label><input id="edit-google" type="url"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-success" onclick="saveEditedBusiness()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
-  let API_KEY  = localStorage.getItem('scanqr_admin_key') || '';
-  const BASE   = window.location.origin;
+  let API_KEY     = localStorage.getItem('scanqr_admin_key') || '';
+  const BASE      = window.location.origin;
+  let autoTimer   = null;
+  let cachedLogs  = [];
 
   // ── Auth ────────────────────────────────────────────────────────────────────
   async function login(providedKey) {
@@ -457,12 +532,32 @@
   function logout() {
     API_KEY = '';
     localStorage.removeItem('scanqr_admin_key');
+    if (autoTimer) clearInterval(autoTimer);
     location.reload();
   }
 
   window.addEventListener('DOMContentLoaded', () => {
     if (API_KEY) login(API_KEY);
   });
+
+  // ── Auto Refresh ────────────────────────────────────────────────────────────
+  function toggleAutoRefresh(enabled) {
+    if (autoTimer) clearInterval(autoTimer);
+    if (enabled) {
+      toast('Auto-refresh enabled (every 10s)', 'success');
+      autoTimer = setInterval(() => {
+        const activeTab = document.querySelector('.tab.active');
+        if (activeTab) {
+          const id = activeTab.id.replace('tab-', '');
+          if (id === 'status') loadStatus();
+          else if (id === 'queue') loadQueueInspector();
+          else if (id === 'analytics') loadAnalytics();
+        }
+      }, 10000);
+    } else {
+      toast('Auto-refresh disabled', 'success');
+    }
+  }
 
   // ── API helper ──────────────────────────────────────────────────────────────
   async function api(path, opts = {}) {
@@ -577,15 +672,41 @@
     }
   }
 
+  async function flushQueue() {
+    const slug = document.getElementById('queueSlugSelect').value || 'saloon';
+    if (!confirm(`Are you sure you want to flush/clear the queue for "${slug}"?`)) return;
+    const r = await api(`/admin/api/queue/${slug}/clear`, { method: 'POST' });
+    if (r.ok) {
+      toast(`Queue for "${slug}" cleared!`, 'success');
+      loadQueueInspector();
+    } else {
+      toast('Failed to clear queue', 'error');
+    }
+  }
+
+  async function forceGenerateAiForQueue() {
+    const slug = document.getElementById('queueSlugSelect').value || 'saloon';
+    toast(`Triggering Gemini AI generation for "${slug}"…`, 'success');
+    const r = await api(`/admin/api/queue/${slug}/generate`, { method: 'POST' });
+    if (r.ok) {
+      toast(`AI review queued for "${slug}"!`, 'success');
+      setTimeout(loadQueueInspector, 1500);
+    } else {
+      toast('AI generation failed or quota reached', 'error');
+    }
+  }
+
   // ── ANALYTICS tab ──────────────────────────────────────────────────────────
   async function loadAnalytics() {
     try {
       const data = await apiJSON('/admin/api/analytics');
+      cachedLogs = data.logs || [];
 
-      const mobileCount = data.deviceStats.Smartphone || 0;
+      const mobileCount  = data.deviceStats.Smartphone || 0;
       const desktopCount = data.deviceStats.Desktop || 0;
-      const totalDevs = mobileCount + desktopCount || 1;
-      const mobilePct = Math.round((mobileCount / totalDevs) * 100);
+      const totalDevs    = mobileCount + desktopCount || 1;
+      const mobilePct    = Math.round((mobileCount / totalDevs) * 100);
+      const desktopPct   = 100 - mobilePct;
 
       document.getElementById('analyticsStatsRow').innerHTML = `
         <div class="stat-card"><div class="stat-label">Total Scans</div><div class="stat-value accent">${data.totalScans}</div></div>
@@ -594,23 +715,53 @@
         <div class="stat-card"><div class="stat-label">Scan Log Entries</div><div class="stat-value up">${data.logs.length}</div></div>
       `;
 
-      const tbody = document.getElementById('analyticsLogBody');
-      if (!data.logs.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">No scan activity logged yet. Scan a QR code to see live activity.</td></tr>';
-      } else {
-        tbody.innerHTML = data.logs.map(l => `
-          <tr>
-            <td>${l.timestamp}</td>
-            <td>${l.date}</td>
-            <td><code style="font-size:0.78rem;color:var(--accent)">${l.slug}</code></td>
-            <td>${l.deviceType}</td>
-            <td>${l.timeOfDay}</td>
-            <td><span class="badge badge-ai">${l.source}</span></td>
-          </tr>
-        `).join('');
-      }
+      document.getElementById('deviceSplitText').textContent = `${mobilePct}% Smartphone (${mobileCount}) · ${desktopPct}% Desktop (${desktopCount})`;
+      document.getElementById('mobileBarFill').style.width = `${mobilePct}%`;
+      document.getElementById('desktopBarFill').style.width = `${desktopPct}%`;
+
+      // Populate filter dropdown
+      const bizList = await apiJSON('/admin/api/businesses');
+      const filterSelect = document.getElementById('analyticsFilterSlug');
+      const curFilter = filterSelect.value || 'ALL';
+      filterSelect.innerHTML = '<option value="ALL">Filter: All Businesses</option>' + 
+        bizList.map(b => `<option value="${b.slug}">${b.name || b.slug} (${b.slug})</option>`).join('');
+      filterSelect.value = curFilter;
+
+      renderAnalyticsLogs();
     } catch (err) {
       toast('Failed to load analytics', 'error');
+    }
+  }
+
+  function renderAnalyticsLogs() {
+    const filterSlug = document.getElementById('analyticsFilterSlug').value;
+    const logs = filterSlug === 'ALL' ? cachedLogs : cachedLogs.filter(l => l.slug === filterSlug);
+    const tbody = document.getElementById('analyticsLogBody');
+
+    if (!logs.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No scan activity logged for this filter.</td></tr>';
+    } else {
+      tbody.innerHTML = logs.map(l => `
+        <tr>
+          <td>${l.timestamp}</td>
+          <td>${l.date}</td>
+          <td><code style="font-size:0.78rem;color:var(--accent)">${l.slug}</code></td>
+          <td>${l.deviceType}</td>
+          <td>${l.timeOfDay}</td>
+          <td><span class="badge badge-ai">${l.source}</span></td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  async function clearAnalyticsHistory() {
+    if (!confirm('Are you sure you want to clear all scan log history?')) return;
+    const r = await api('/admin/api/analytics/clear', { method: 'DELETE' });
+    if (r.ok) {
+      toast('Analytics history cleared!', 'success');
+      loadAnalytics();
+    } else {
+      toast('Failed to clear analytics', 'error');
     }
   }
 
@@ -651,7 +802,9 @@
           </div>
           <div class="biz-actions">
             <button class="btn btn-success btn-sm" onclick="testReview('${b.slug}')">⚡ Test Gemini AI</button>
+            <button class="btn btn-ghost btn-sm" onclick="openEditModal('${b.slug}','${escapeHtml(b.name || '')}','${escapeHtml(b.type || '')}','${escapeHtml(b.googleReviewLink || '')}')">✏️ Edit</button>
             <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${siteUrl}');toast('Vercel URL Copied!','success')">📋 Copy URL</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteBusiness('${b.slug}')">🗑️ Delete</button>
           </div>
         </div>
       `}).join('');
@@ -660,17 +813,30 @@
     }
   }
 
+  function escapeHtml(str) {
+    return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  }
+
   function toggleAddForm() {
     document.getElementById('addForm').classList.toggle('open');
+  }
+
+  function toggleCustomCategoryInput(mode) {
+    const sel = document.getElementById(`${mode}-type`).value;
+    const customInp = document.getElementById(`${mode}-type-custom`);
+    customInp.style.display = sel === 'custom' ? 'block' : 'none';
   }
 
   async function addBusiness() {
     const slug = document.getElementById('new-slug').value.trim().toLowerCase().replace(/\s+/g,'_');
     if (!slug) { toast('Slug is required', 'error'); return; }
 
+    const selType = document.getElementById('new-type').value;
+    const type    = selType === 'custom' ? document.getElementById('new-type-custom').value.trim() || 'store' : selType;
+
     const body = {
       name:             document.getElementById('new-name').value.trim() || slug,
-      type:             document.getElementById('new-type').value,
+      type:             type,
       googleReviewLink: document.getElementById('new-google').value.trim(),
       siteUrl:          `https://scanqr-beta.vercel.app?biz=${slug}`
     };
@@ -682,6 +848,63 @@
       loadBusinesses();
     } else {
       toast('Failed to save business', 'error');
+    }
+  }
+
+  function openEditModal(slug, name, type, googleLink) {
+    document.getElementById('edit-slug').value = slug;
+    document.getElementById('edit-slug-display').value = slug;
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-google').value = googleLink;
+
+    const select = document.getElementById('edit-type');
+    const customInp = document.getElementById('edit-type-custom');
+    if (Array.from(select.options).some(o => o.value === type)) {
+      select.value = type;
+      customInp.style.display = 'none';
+    } else {
+      select.value = 'custom';
+      customInp.value = type;
+      customInp.style.display = 'block';
+    }
+
+    document.getElementById('editBusinessModal').classList.add('open');
+  }
+
+  function closeEditModal() {
+    document.getElementById('editBusinessModal').classList.remove('open');
+  }
+
+  async function saveEditedBusiness() {
+    const slug = document.getElementById('edit-slug').value;
+    const selType = document.getElementById('edit-type').value;
+    const type    = selType === 'custom' ? document.getElementById('edit-type-custom').value.trim() || 'store' : selType;
+
+    const body = {
+      name:             document.getElementById('edit-name').value.trim() || slug,
+      type:             type,
+      googleReviewLink: document.getElementById('edit-google').value.trim(),
+      siteUrl:          `https://scanqr-beta.vercel.app?biz=${slug}`
+    };
+
+    const r = await api(`/admin/api/config/${slug}`, { method: 'POST', body });
+    if (r.ok) {
+      toast(`Business "${body.name}" Updated Successfully!`, 'success');
+      closeEditModal();
+      loadBusinesses();
+    } else {
+      toast('Failed to update business', 'error');
+    }
+  }
+
+  async function deleteBusiness(slug) {
+    if (!confirm(`Are you sure you want to delete business "${slug}"?`)) return;
+    const r = await api(`/admin/api/config/${slug}`, { method: 'DELETE' });
+    if (r.ok) {
+      toast(`Business "${slug}" deleted!`, 'success');
+      loadBusinesses();
+    } else {
+      toast('Failed to delete business', 'error');
     }
   }
 
@@ -741,13 +964,18 @@
   }
 
   async function saveSettings() {
+    const newAdminKey = document.getElementById('adminKeyInput').value.trim();
     const body = {
       geminiApiKey: document.getElementById('geminiKeyInput').value.trim() || undefined,
-      adminApiKey:  document.getElementById('adminKeyInput').value.trim()  || undefined
+      adminApiKey:  newAdminKey || undefined
     };
     const r = await api('/admin/api/settings', { method: 'POST', body });
     if (r.ok) {
-      toast('Keys updated in-memory. Update Render env vars to persist.', 'success');
+      if (newAdminKey) {
+        API_KEY = newAdminKey;
+        localStorage.setItem('scanqr_admin_key', newAdminKey);
+      }
+      toast('Keys updated in-memory & Auth updated! Update Render env vars to persist.', 'success');
     } else {
       toast('Failed to save', 'error');
     }
