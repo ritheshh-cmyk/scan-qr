@@ -1029,7 +1029,7 @@ app.get('/admin/api/status', adminAuth, async (req, res) => {
 });
 
 app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ── INITIALIZE TURSO DB & BANK ON STARTUP ─────────────────────────────────────
