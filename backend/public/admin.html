@@ -402,6 +402,31 @@
   .grid-2col-logo   { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; }
   .grid-3col-name   { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 
+  /* ── Responsive Utilities ── */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1rem;
+  }
+  .tab-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .info-banner {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(16, 185, 129, 0.1));
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 14px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
   /* ===== MOBILE RESPONSIVE ===== */
   @media (max-width: 768px) {
 
@@ -457,6 +482,7 @@
 
     /* Form grids */
     .add-form-grid { grid-template-columns: 1fr !important; }
+    .add-form-grid [style*="grid-column"] { grid-column: span 1 !important; }
     .add-form { padding: 14px 12px; }
 
     /* Tables */
@@ -475,9 +501,36 @@
     .grid-3col        { grid-template-columns: 1fr 1fr !important; }
     .grid-2col-logo   { grid-template-columns: 1fr !important; }
     .grid-3col-name   { grid-template-columns: 1fr 1fr !important; }
+    #tab-content-qrstudio [style*="position:sticky"],
+    #tab-content-qrstudio [style*="position: sticky"] {
+      position: static !important;
+    }
 
     /* Health tab */
     #healthFifoGrid   { grid-template-columns: 1fr 1fr !important; }
+
+    /* Responsive tab headers & banners */
+    .tab-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .tab-header > div {
+      width: 100%;
+    }
+    .tab-header .btn {
+      width: 100%;
+      justify-content: center;
+    }
+    .tab-header .flex-gap {
+      flex-direction: column;
+      width: 100%;
+    }
+    .info-banner {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
 
     /* Toast — centered on mobile */
     #toast { bottom: 14px; right: 10px; left: 10px; text-align: center; }
@@ -566,10 +619,12 @@
       <!-- System info table -->
       <div class="card">
         <div class="card-header"><h3>🖥️ System Info</h3></div>
-        <table class="status-table" id="healthSysTable">
-          <thead><tr><th>Property</th><th>Value</th></tr></thead>
-          <tbody id="healthSysBody"></tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="status-table" id="healthSysTable">
+            <thead><tr><th>Property</th><th>Value</th></tr></thead>
+            <tbody id="healthSysBody"></tbody>
+          </table>
+        </div>
       </div>
 
     </div>
@@ -583,29 +638,31 @@
           <button class="btn btn-ghost btn-sm" onclick="loadStatus()">↻ Refresh Status</button>
         </div>
         <div id="loadingSpinner" style="display:none;text-align:center;padding:30px;color:var(--muted)">Checking registered sites…</div>
-        <table class="status-table">
-          <thead>
-            <tr>
-              <th>Business Name</th>
-              <th>Slug</th>
-              <th>Live Vercel Link</th>
-              <th>Status</th>
-              <th>Latency</th>
-            </tr>
-          </thead>
-          <tbody id="statusBody"></tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="status-table">
+            <thead>
+              <tr>
+                <th>Business Name</th>
+                <th>Slug</th>
+                <th>Live Vercel Link</th>
+                <th>Status</th>
+                <th>Latency</th>
+              </tr>
+            </thead>
+            <tbody id="statusBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
     <!-- ── 5K REVIEW BANK & CSV AUDIT TAB ───────────────────── -->
     <div id="tab-content-bank" style="display:none">
-      <div style="margin-bottom:24px;display:flex;align-items:center;justify-content:space-between">
+      <div class="tab-header">
         <div>
           <div style="font-family:'Outfit',sans-serif;font-size:1.35rem;font-weight:800;margin-bottom:6px">📦 15,000 Pre-Loaded Review Bank Engine (Turso Cloud DB)</div>
           <div style="font-size:0.88rem;color:var(--muted)">Pre-loaded 5,000 human-toned reviews per business stored in Turso Cloud DB. Zero rate limits, zero quota errors, instant &lt; 5ms customer serving.</div>
         </div>
-        <div style="display:flex;gap:12px">
+        <div style="display:flex;gap:12px" class="flex-gap">
           <button class="btn btn-primary btn-sm" onclick="exportBankCsv()">📥 Download 15K Reviews CSV</button>
           <button class="btn btn-success btn-sm" onclick="populateAll15kBanks()">⚡ Populate All 15K Banks</button>
         </div>
@@ -628,16 +685,18 @@
 
         <div id="bankInspectorMeta" style="font-size:0.88rem;color:var(--muted);margin-bottom:16px">Loading review bank entries…</div>
 
-        <table class="status-table">
-          <thead>
-            <tr>
-              <th style="width:70px">#</th>
-              <th style="width:160px">Business</th>
-              <th>Review Text</th>
-            </tr>
-          </thead>
-          <tbody id="bankInspectorBody"></tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="status-table">
+            <thead>
+              <tr>
+                <th style="width:70px">#</th>
+                <th style="width:160px">Business</th>
+                <th>Review Text</th>
+              </tr>
+            </thead>
+            <tbody id="bankInspectorBody"></tbody>
+          </table>
+        </div>
 
         <!-- Pagination -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px">
@@ -652,7 +711,7 @@
     <div id="tab-content-qrstudio" style="display:none">
 
       <!-- No Expiry Info Banner -->
-      <div style="background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(16,185,129,0.1));border:1px solid rgba(99,102,241,0.3);border-radius:14px;padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:14px">
+      <div class="info-banner">
         <div style="font-size:2rem">♾️</div>
         <div>
           <div style="font-weight:700;font-size:0.97rem;margin-bottom:3px">QR Codes Never Expire</div>
@@ -841,27 +900,29 @@
             <button class="btn btn-ghost btn-sm" onclick="clearAnalyticsHistory()" style="color:var(--danger)">🗑️ Clear Logs</button>
           </div>
         </div>
-        <table class="status-table">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Date</th>
-              <th>Business Slug</th>
-              <th>Device</th>
-              <th>Time of Day</th>
-              <th>Review Engine Source</th>
-            </tr>
-          </thead>
-          <tbody id="analyticsLogBody"></tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="status-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Date</th>
+                <th>Business Slug</th>
+                <th>Device</th>
+                <th>Time of Day</th>
+                <th>Review Engine Source</th>
+              </tr>
+            </thead>
+            <tbody id="analyticsLogBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
     <!-- ── BUSINESSES TAB ───────────────────────────────────── -->
     <div id="tab-content-businesses" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <div class="tab-header">
         <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:1.35rem">Registered Businesses (Turso Cloud DB Active)</div>
-        <div style="display:flex;gap:12px">
+        <div style="display:flex;gap:12px" class="flex-gap">
           <button class="btn btn-ghost btn-sm" onclick="exportDbJson()">📥 Backup DB</button>
           <button class="btn btn-success btn-sm" onclick="toggleAddForm()">+ Add New Business</button>
         </div>
