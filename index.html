@@ -97,6 +97,22 @@
       0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(250,204,21,0.2)); }
       50% { transform: scale(1.22); filter: drop-shadow(0 0 8px rgba(250,204,21,0.6)); }
     }
+
+    .tap-hint {
+      margin-top: 18px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--rose);
+      opacity: 0.85;
+      animation: pulseText 1.8s infinite ease-in-out;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    @keyframes pulseText {
+      0%, 100% { opacity: 0.65; transform: scale(0.97); }
+      50% { opacity: 1; transform: scale(1.03); }
+    }
   </style>
 </head>
 <body>
@@ -112,6 +128,7 @@
     <button class="btn-tap" id="mainBtn" type="button">
       Tap Anywhere if Not Redirected
     </button>
+    <div class="tap-hint" id="tapHint">✨ Tap anywhere on screen to copy & review ✨</div>
   </main>
 
   <script>
@@ -221,6 +238,12 @@
       mainBtn.textContent = "Opening... 🚀";
       mainBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
       mainBtn.style.boxShadow = "0 10px 24px rgba(16, 185, 129, 0.4)";
+      
+      const tapHint = document.getElementById('tapHint');
+      if (tapHint) {
+        tapHint.textContent = "Review Copied! Redirecting...";
+        tapHint.style.color = "#10b981";
+      }
       
       // Copy to clipboard synchronously in gesture, then redirect inside resolve
       copyReviewToClipboard(activeReview).then(() => {
