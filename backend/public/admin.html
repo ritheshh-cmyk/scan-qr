@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ScanQR Admin Suite v10.0</title>
+<title>ScanQR Enterprise Studio v11.0</title>
+<!-- QRCode.js library for Instant QR Generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -191,7 +193,7 @@
   .dot-up   { background: var(--up);   box-shadow: 0 0 6px var(--up);   }
   .dot-down { background: var(--down); box-shadow: 0 0 6px var(--down); }
 
-  .biz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .biz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
 
   .biz-card {
     background: var(--card);
@@ -229,7 +231,7 @@
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 28px;
-    width: min(100% - 32px, 560px);
+    width: min(100% - 32px, 580px);
     max-height: 90vh;
     overflow-y: auto;
   }
@@ -268,6 +270,13 @@
   
   .traffic-bar-bg { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; height: 12px; overflow: hidden; margin-top: 8px; display: flex; }
   .traffic-bar-fill { height: 100%; transition: width 300ms ease; }
+
+  /* Printable Counter Stand Styling */
+  @media print {
+    body * { visibility: hidden; }
+    #printableStand, #printableStand * { visibility: visible; }
+    #printableStand { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; color: black; }
+  }
 </style>
 </head>
 <body>
@@ -276,7 +285,7 @@
 <div id="loginScreen">
   <div class="login-card">
     <div class="logo">⚡</div>
-    <h1>ScanQR Admin Suite</h1>
+    <h1>ScanQR Enterprise Studio</h1>
     <p>Enter your admin API key to continue</p>
     <input id="apiKeyInput" type="password" placeholder="Default key: Lucky@000" style="margin-bottom:14px">
     <button class="btn btn-primary" onclick="login()">Sign In</button>
@@ -287,7 +296,7 @@
 <!-- ── App ───────────────────────────────────────────────────── -->
 <div id="app">
   <div class="topbar">
-    <div class="brand">⚡ ScanQR Admin</div>
+    <div class="brand">⚡ ScanQR Admin Suite</div>
     <label class="auto-refresh-toggle">
       <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh(this.checked)">
       ⏱️ Auto-Refresh (10s)
@@ -299,6 +308,7 @@
 
   <div class="tabs">
     <div class="tab active" onclick="switchTab('status',this)" id="tab-status">📊 Status</div>
+    <div class="tab" onclick="switchTab('qrstudio',this)" id="tab-qrstudio">🎨 QR Studio & Print</div>
     <div class="tab" onclick="switchTab('queue',this)" id="tab-queue">📥 FIFO Queue Inspector</div>
     <div class="tab" onclick="switchTab('analytics',this)" id="tab-analytics">📈 Analytics</div>
     <div class="tab" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
@@ -328,6 +338,46 @@
           </thead>
           <tbody id="statusBody"></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ── QR STUDIO & PRINT tab ───────────────────────────── -->
+    <div id="tab-content-qrstudio" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <h3>🎨 Live QR Code Designer & Print Studio</h3>
+          <button class="btn btn-success btn-sm" onclick="openPrintModal()">🖨️ Print Counter Stand</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start">
+          <div style="display:grid;gap:14px">
+            <div>
+              <label style="font-size:0.85rem;color:var(--muted)">Select Business</label>
+              <select id="qrBizSelect" onchange="renderQrStudio()"></select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label style="font-size:0.85rem;color:var(--muted)">QR Dark Color</label>
+                <input id="qrDarkColor" type="color" value="#6c63ff" onchange="renderQrStudio()" style="height:44px;padding:4px;cursor:pointer">
+              </div>
+              <div>
+                <label style="font-size:0.85rem;color:var(--muted)">QR Light Color</label>
+                <input id="qrLightColor" type="color" value="#ffffff" onchange="renderQrStudio()" style="height:44px;padding:4px;cursor:pointer">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:0.85rem;color:var(--muted)">Target Target URL (Vercel Frontend)</label>
+              <input id="qrTargetUrl" type="text" readonly style="opacity:0.7">
+            </div>
+          </div>
+
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center">
+            <div id="qrCanvasContainer" style="display:inline-block;padding:12px;background:#fff;border-radius:12px;margin-bottom:14px"></div>
+            <div style="display:flex;gap:8px;justify-content:center">
+              <button class="btn btn-primary btn-sm" onclick="downloadQrPng()">📥 Download PNG</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -371,6 +421,7 @@
             <select id="analyticsFilterSlug" style="width:auto;padding:6px 12px;font-size:0.85rem;" onchange="renderAnalyticsLogs()">
               <option value="ALL">Filter: All Businesses</option>
             </select>
+            <button class="btn btn-ghost btn-sm" onclick="exportAnalyticsCsv()">📥 Export CSV</button>
             <button class="btn btn-ghost btn-sm" onclick="loadAnalytics()">↻ Refresh</button>
             <button class="btn btn-ghost btn-sm" onclick="clearAnalyticsHistory()" style="color:var(--danger)">🗑️ Clear Logs</button>
           </div>
@@ -418,7 +469,18 @@
             </select>
             <input id="new-type-custom" type="text" placeholder="Type custom category e.g. Bakery" style="display:none;margin-top:8px">
           </div>
-          <div class="row"><label>Google Review Link</label><input id="new-google" type="url" placeholder="https://search.google.com/local/writereview?placeid=YOUR_ID"></div>
+          <div class="row"><label>Target Review Language</label>
+            <select id="new-lang">
+              <option value="English">🇺🇸 English</option>
+              <option value="Spanish">🇪🇸 Spanish</option>
+              <option value="Hindi">🇮🇳 Hindi / Hinglish</option>
+              <option value="French">🇫🇷 French</option>
+              <option value="German">🇩🇪 German</option>
+              <option value="Arabic">🇦🇪 Arabic</option>
+            </select>
+          </div>
+          <div class="row" style="grid-column: span 2"><label>Google Review Link</label><input id="new-google" type="url" placeholder="https://search.google.com/local/writereview?placeid=YOUR_ID"></div>
+          <div class="row" style="grid-column: span 2"><label>Gemini API Key (Optional — overrides global key for this business)</label><input id="new-apikey" type="text" placeholder="AQ.Ab8RN6… (Leave empty to use global key)"></div>
         </div>
         <div style="display:flex;gap:10px;margin-top:16px">
           <button class="btn btn-primary btn-sm" onclick="addBusiness()">Save & Activate Business</button>
@@ -487,11 +549,41 @@
         </select>
         <input id="edit-type-custom" type="text" placeholder="Type custom category e.g. Bakery" style="display:none;margin-top:8px">
       </div>
+      <div><label style="font-size:0.8rem;color:var(--muted);">Target Review Language</label>
+        <select id="edit-lang">
+          <option value="English">🇺🇸 English</option>
+          <option value="Spanish">🇪🇸 Spanish</option>
+          <option value="Hindi">🇮🇳 Hindi / Hinglish</option>
+          <option value="French">🇫🇷 French</option>
+          <option value="German">🇩🇪 German</option>
+          <option value="Arabic">🇦🇪 Arabic</option>
+        </select>
+      </div>
       <div><label style="font-size:0.8rem;color:var(--muted);">Google Review Link</label><input id="edit-google" type="url"></div>
+      <div><label style="font-size:0.8rem;color:var(--muted);">Gemini API Key (Optional — overrides global key)</label><input id="edit-apikey" type="text" placeholder="AQ.Ab8RN6… (Leave empty to use global key)"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeEditModal()">Cancel</button>
       <button class="btn btn-success" onclick="saveEditedBusiness()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Printable Counter Stand Modal ───────────────────────────── -->
+<div class="modal-overlay" id="printModal" onclick="if(event.target===this)closePrintModal()">
+  <div class="modal" style="width:min(100% - 32px, 480px);background:#fff;color:#000;">
+    <div id="printableStand" style="text-align:center;padding:20px;">
+      <div id="printIcon" style="font-size:2.8rem;margin-bottom:8px">💇‍♀️</div>
+      <h2 id="printTitle" style="font-size:1.4rem;font-weight:800;margin-bottom:6px">Royal Saloon & Spa</h2>
+      <p style="font-size:0.9rem;color:#555;margin-bottom:20px">Scan to Leave a 5-Star Google Review!</p>
+
+      <div id="printQrContainer" style="display:inline-block;padding:16px;border:2px dashed #ccc;border-radius:16px;margin-bottom:16px"></div>
+
+      <div style="font-size:0.82rem;color:#777;">⭐ Automatic 5-Star Review Copied & Redirected ⭐</div>
+    </div>
+    <div class="modal-footer" style="border-top:1px solid #eee;padding-top:14px">
+      <button class="btn btn-ghost" onclick="closePrintModal()">Close</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Print Now</button>
     </div>
   </div>
 </div>
@@ -503,6 +595,7 @@
   const BASE      = window.location.origin;
   let autoTimer   = null;
   let cachedLogs  = [];
+  let qrObj       = null;
 
   // ── Auth ────────────────────────────────────────────────────────────────────
   async function login(providedKey) {
@@ -582,10 +675,11 @@
   function switchTab(name, el) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
-    ['status','queue','analytics','businesses','settings'].forEach(t => {
+    ['status','qrstudio','queue','analytics','businesses','settings'].forEach(t => {
       document.getElementById(`tab-content-${t}`).style.display = t === name ? '' : 'none';
     });
     if (name === 'status')      loadStatus();
+    if (name === 'qrstudio')    loadQrStudio();
     if (name === 'queue')       loadQueueInspector();
     if (name === 'analytics')   loadAnalytics();
     if (name === 'businesses')  loadBusinesses();
@@ -630,6 +724,77 @@
     }
 
     document.getElementById('loadingSpinner').style.display = 'none';
+  }
+
+  // ── QR STUDIO tab ───────────────────────────────────────────────────────────
+  async function loadQrStudio() {
+    try {
+      const list = await apiJSON('/admin/api/businesses');
+      const select = document.getElementById('qrBizSelect');
+      const curVal = select.value;
+
+      select.innerHTML = list.map(b => `<option value="${b.slug}">${b.name || b.slug} (${b.slug})</option>`).join('');
+      if (curVal && list.some(b => b.slug === curVal)) {
+        select.value = curVal;
+      }
+      renderQrStudio();
+    } catch {}
+  }
+
+  async function renderQrStudio() {
+    const slug = document.getElementById('qrBizSelect').value || 'saloon';
+    const targetUrl = `https://scanqr-beta.vercel.app?biz=${slug}`;
+    document.getElementById('qrTargetUrl').value = targetUrl;
+
+    const darkColor  = document.getElementById('qrDarkColor').value || '#6c63ff';
+    const lightColor = document.getElementById('qrLightColor').value || '#ffffff';
+
+    const container = document.getElementById('qrCanvasContainer');
+    container.innerHTML = '';
+
+    qrObj = new QRCode(container, {
+      text: targetUrl,
+      width: 200,
+      height: 200,
+      colorDark: darkColor,
+      colorLight: lightColor,
+      correctLevel: QRCode.CorrectLevel.H
+    });
+  }
+
+  function downloadQrPng() {
+    const canvas = document.querySelector('#qrCanvasContainer canvas');
+    if (!canvas) { toast('QR Code not ready', 'error'); return; }
+    const slug = document.getElementById('qrBizSelect').value || 'qr';
+    const link = document.createElement('a');
+    link.download = `ScanQR_${slug}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast('QR Code PNG Downloaded!', 'success');
+  }
+
+  function openPrintModal() {
+    const slug = document.getElementById('qrBizSelect').value || 'saloon';
+    const targetUrl = `https://scanqr-beta.vercel.app?biz=${slug}`;
+    
+    document.getElementById('printTitle').textContent = slug.toUpperCase().replace(/_/g, ' ');
+    const printContainer = document.getElementById('printQrContainer');
+    printContainer.innerHTML = '';
+
+    new QRCode(printContainer, {
+      text: targetUrl,
+      width: 180,
+      height: 180,
+      colorDark: "#000000",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.H
+    });
+
+    document.getElementById('printModal').classList.add('open');
+  }
+
+  function closePrintModal() {
+    document.getElementById('printModal').classList.remove('open');
   }
 
   // ── QUEUE INSPECTOR tab ─────────────────────────────────────────────────────
@@ -719,7 +884,6 @@
       document.getElementById('mobileBarFill').style.width = `${mobilePct}%`;
       document.getElementById('desktopBarFill').style.width = `${desktopPct}%`;
 
-      // Populate filter dropdown
       const bizList = await apiJSON('/admin/api/businesses');
       const filterSelect = document.getElementById('analyticsFilterSlug');
       const curFilter = filterSelect.value || 'ALL';
@@ -752,6 +916,11 @@
         </tr>
       `).join('');
     }
+  }
+
+  function exportAnalyticsCsv() {
+    window.open(`${BASE}/admin/api/analytics/export?key=${encodeURIComponent(API_KEY)}`, '_blank');
+    toast('Downloading Analytics CSV Report…', 'success');
   }
 
   async function clearAnalyticsHistory() {
@@ -787,6 +956,9 @@
       if (!list.length) { grid.innerHTML = '<div class="empty">No businesses yet. Click + Add New Business.</div>'; return; }
       grid.innerHTML = list.map(b => {
         const siteUrl = b.siteUrl || `https://scanqr-beta.vercel.app?biz=${b.slug}`;
+        const keyBadge = b.hasCustomApiKey ? `<span class="badge badge-up" style="font-size:0.72rem">🔑 Custom Key: ${b.maskedApiKey}</span>` : `<span class="badge badge-nourl" style="font-size:0.72rem">🌐 Global Key</span>`;
+        const langBadge = `<span class="badge badge-ai" style="font-size:0.72rem">🌐 ${b.language || 'English'}</span>`;
+
         return `
         <div class="biz-card">
           <div class="biz-card-header">
@@ -794,7 +966,10 @@
               <div class="biz-name">${b.name || b.slug}</div>
               <div class="biz-slug">slug: <code>${b.slug}</code> · type: <strong>${b.type || 'business'}</strong></div>
             </div>
-            <span class="badge badge-ai">⚡ Live AI</span>
+            <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+              ${keyBadge}
+              ${langBadge}
+            </div>
           </div>
           ${b.googleReviewLink ? `<div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔗 ${b.googleReviewLink}</div>` : ''}
           <div style="font-size:0.8rem;color:var(--accent2);background:var(--bg);padding:6px 10px;border-radius:6px;border:1px solid var(--border);margin-bottom:12px;word-break:break-all">
@@ -802,7 +977,8 @@
           </div>
           <div class="biz-actions">
             <button class="btn btn-success btn-sm" onclick="testReview('${b.slug}')">⚡ Test Gemini AI</button>
-            <button class="btn btn-ghost btn-sm" onclick="openEditModal('${b.slug}','${escapeHtml(b.name || '')}','${escapeHtml(b.type || '')}','${escapeHtml(b.googleReviewLink || '')}')">✏️ Edit</button>
+            <button class="btn btn-ghost btn-sm" onclick="openEditModal('${b.slug}','${escapeHtml(b.name || '')}','${escapeHtml(b.type || '')}','${escapeHtml(b.googleReviewLink || '')}','${escapeHtml(b.language || 'English')}','${escapeHtml(b.geminiApiKey || '')}')">✏️ Edit</button>
+            ${b.googleReviewLink ? `<a href="${b.googleReviewLink}" target="_blank" class="btn btn-ghost btn-sm" style="color:var(--accent2);text-decoration:none">🔗 Test Google Link</a>` : ''}
             <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${siteUrl}');toast('Vercel URL Copied!','success')">📋 Copy URL</button>
             <button class="btn btn-danger btn-sm" onclick="deleteBusiness('${b.slug}')">🗑️ Delete</button>
           </div>
@@ -837,7 +1013,9 @@
     const body = {
       name:             document.getElementById('new-name').value.trim() || slug,
       type:             type,
+      language:         document.getElementById('new-lang').value || 'English',
       googleReviewLink: document.getElementById('new-google').value.trim(),
+      geminiApiKey:     document.getElementById('new-apikey').value.trim() || undefined,
       siteUrl:          `https://scanqr-beta.vercel.app?biz=${slug}`
     };
 
@@ -851,11 +1029,13 @@
     }
   }
 
-  function openEditModal(slug, name, type, googleLink) {
+  function openEditModal(slug, name, type, googleLink, lang, apiKey) {
     document.getElementById('edit-slug').value = slug;
     document.getElementById('edit-slug-display').value = slug;
     document.getElementById('edit-name').value = name;
     document.getElementById('edit-google').value = googleLink;
+    document.getElementById('edit-lang').value = lang || 'English';
+    document.getElementById('edit-apikey').value = apiKey || '';
 
     const select = document.getElementById('edit-type');
     const customInp = document.getElementById('edit-type-custom');
@@ -883,7 +1063,9 @@
     const body = {
       name:             document.getElementById('edit-name').value.trim() || slug,
       type:             type,
+      language:         document.getElementById('edit-lang').value || 'English',
       googleReviewLink: document.getElementById('edit-google').value.trim(),
+      geminiApiKey:     document.getElementById('edit-apikey').value.trim() || undefined,
       siteUrl:          `https://scanqr-beta.vercel.app?biz=${slug}`
     };
 
@@ -926,6 +1108,7 @@
           <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px;">
             <div style="font-size:1.02rem;line-height:1.55;color:var(--text);margin-bottom:14px;">"${data.review}"</div>
             <div style="display:flex;gap:12px;font-size:0.8rem;color:var(--muted);border-top:1px solid var(--border);padding-top:12px;flex-wrap:wrap">
+              <span>🌐 Lang: <strong>${data.language || 'English'}</strong></span>
               <span>🤖 Model: <strong>${data.modelUsed}</strong></span>
               <span>⚡ Latency: <strong>${data.latencyMs}ms</strong></span>
               <span>📝 Words: <strong>${data.wordCount}</strong></span>

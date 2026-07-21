@@ -15,19 +15,22 @@ const DEFAULT_BUSINESSES = {
     name: "Royal Saloon & Spa",
     type: "saloon",
     googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_SALOON_PLACE_ID",
-    siteUrl: "https://scanqr-beta.vercel.app?biz=saloon"
+    siteUrl: "https://scanqr-beta.vercel.app?biz=saloon",
+    language: "English"
   },
   youngwear_fashions: {
     name: "Youngwear Fashions",
     type: "clothing store",
     googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_YOUNGWEAR_PLACE_ID",
-    siteUrl: "https://scanqr-beta.vercel.app?biz=youngwear_fashions"
+    siteUrl: "https://scanqr-beta.vercel.app?biz=youngwear_fashions",
+    language: "English"
   },
   demo: {
     name: "Demo Beauty Salon",
     type: "salon",
     googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_DEMO_PLACE_ID",
-    siteUrl: "https://scanqr-beta.vercel.app?biz=demo"
+    siteUrl: "https://scanqr-beta.vercel.app?biz=demo",
+    language: "English"
   }
 };
 
@@ -156,7 +159,8 @@ function getBizConfig(slug) {
     name: formattedName,
     type: inferredType,
     googleReviewLink: `https://search.google.com/local/writereview?placeid=${cleanSlug}`,
-    siteUrl: `https://scanqr-beta.vercel.app?biz=${cleanSlug}`
+    siteUrl: `https://scanqr-beta.vercel.app?biz=${cleanSlug}`,
+    language: "English"
   };
 }
 
@@ -224,16 +228,20 @@ function getClientMetadata(req) {
   return { ip, userAgent, deviceType, lang, timeOfDay, timestamp: Date.now() };
 }
 
-// ── Background Worker: Generate new AI review with High Entropy ────────────────
+// ── Background Worker: Generate new AI review with High Entropy & Multi-Language ────────
 async function generateAndEnqueueReview(slug, meta, customInput = {}) {
   const cleanSlug = sanitizeSlug(slug);
   const config    = getBizConfig(cleanSlug);
-  const geminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
 
-  if (!geminiKey) return;
+  // AUTOMATIC KEY FAILOVER MATRIX: Primary Key (custom per business) -> Backup Key (global Render env)
+  const primaryKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
+  const backupKey  = process.env.GEMINI_API_KEY;
+
+  if (!primaryKey && !backupKey) return;
 
   const type = config.type || 'business';
   const name = config.name || cleanSlug;
+  const lang = config.language || 'English';
 
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
@@ -241,40 +249,63 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
 
   const fullPrompt =
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
+    `Language: Write the review naturally in ${lang}.\n` +
     `Style persona: ${selectedPersona}\n` +
     `Include a natural casual phrase like "${selectedPhrase}".\n` +
     `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). DO NOT use cliché phrases like '10/10' or '5 stars'. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
 
+  let reviewText = null;
+  let modelUsed  = null;
+  let usedKey    = primaryKey;
+
   try {
-    const genAI = new GoogleGenerativeAI(geminiKey);
-    const { text: reviewText, modelUsed } = await generateWithFallbackModel(genAI, fullPrompt);
-
-    if (!reviewQueues[cleanSlug]) reviewQueues[cleanSlug] = [];
-    if (!recentReviews[cleanSlug]) recentReviews[cleanSlug] = new Set();
-
-    if (recentReviews[cleanSlug].has(reviewText)) {
+    const genAI = new GoogleGenerativeAI(primaryKey);
+    const res = await generateWithFallbackModel(genAI, fullPrompt);
+    reviewText = res.text;
+    modelUsed  = res.modelUsed;
+  } catch (primaryErr) {
+    console.warn(`[Primary Key Warning] ${cleanSlug}: ${primaryErr.message}. Attempting failover to backup key…`);
+    if (backupKey && backupKey !== primaryKey) {
+      try {
+        const genAI = new GoogleGenerativeAI(backupKey);
+        const res = await generateWithFallbackModel(genAI, fullPrompt);
+        reviewText = res.text;
+        modelUsed  = res.modelUsed + ' (failover)';
+        usedKey    = backupKey;
+      } catch (backupErr) {
+        console.error(`[Backup Key Error] ${cleanSlug}: ${backupErr.message}`);
+        return;
+      }
+    } else {
       return;
     }
+  }
 
-    recentReviews[cleanSlug].add(reviewText);
-    if (recentReviews[cleanSlug].size > 50) {
-      const firstItem = recentReviews[cleanSlug].values().next().value;
-      recentReviews[cleanSlug].delete(firstItem);
-    }
+  if (!reviewText) return;
 
-    reviewQueues[cleanSlug].push({
-      review: reviewText,
-      generated: true,
-      source: `gemini-high-entropy (${modelUsed})`,
-      meta: { deviceType: meta.deviceType || 'Smartphone', persona: selectedPersona, modelUsed },
-      timestamp: Date.now()
-    });
+  if (!reviewQueues[cleanSlug]) reviewQueues[cleanSlug] = [];
+  if (!recentReviews[cleanSlug]) recentReviews[cleanSlug] = new Set();
 
-    while (reviewQueues[cleanSlug].length > MAX_QUEUE_SIZE) {
-      reviewQueues[cleanSlug].shift();
-    }
-  } catch (err) {
-    console.error(`[Queue Error] ${cleanSlug}:`, err.message);
+  if (recentReviews[cleanSlug].has(reviewText)) {
+    return;
+  }
+
+  recentReviews[cleanSlug].add(reviewText);
+  if (recentReviews[cleanSlug].size > 50) {
+    const firstItem = recentReviews[cleanSlug].values().next().value;
+    recentReviews[cleanSlug].delete(firstItem);
+  }
+
+  reviewQueues[cleanSlug].push({
+    review: reviewText,
+    generated: true,
+    source: `gemini-high-entropy (${modelUsed})`,
+    meta: { deviceType: meta.deviceType || 'Smartphone', persona: selectedPersona, modelUsed, language: lang },
+    timestamp: Date.now()
+  });
+
+  while (reviewQueues[cleanSlug].length > MAX_QUEUE_SIZE) {
+    reviewQueues[cleanSlug].shift();
   }
 }
 
@@ -359,11 +390,12 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
   const geminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
 
   if (!geminiKey) {
-    return res.status(503).json({ error: 'Gemini API Key is missing. Enter a valid key in Settings tab.', generated: false });
+    return res.status(503).json({ error: 'Gemini API Key is missing. Enter a valid key in Settings or Business form.', generated: false });
   }
 
   const type = config.type || 'business';
   const name = config.name || cleanSlug;
+  const lang = config.language || 'English';
 
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
@@ -371,6 +403,7 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
 
   const fullPrompt =
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
+    `Language: Write the review naturally in ${lang}.\n` +
     `Style persona: ${selectedPersona}\n` +
     `Include a natural casual phrase like "${selectedPhrase}".\n` +
     `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). DO NOT use cliché phrases like '10/10' or '5 stars'. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
@@ -384,6 +417,7 @@ app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
       review: reviewText,
       generated: true,
       persona: selectedPersona,
+      language: lang,
       modelUsed,
       latencyMs: Date.now() - t0,
       wordCount: reviewText.split(/\s+/).length
@@ -416,14 +450,12 @@ app.get('/admin/api/queue/:slug', adminAuth, (req, res) => {
   });
 });
 
-// Flush Queue for a business
 app.post('/admin/api/queue/:slug/clear', adminAuth, (req, res) => {
   const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
   reviewQueues[cleanSlug] = [];
   res.json({ success: true, message: `Queue for business '${cleanSlug}' cleared successfully.` });
 });
 
-// Force Generate AI Review into Queue
 app.post('/admin/api/queue/:slug/generate', adminAuth, async (req, res) => {
   const cleanSlug  = sanitizeSlug(req.params.slug) || 'saloon';
   const clientMeta = getClientMetadata(req);
@@ -432,7 +464,7 @@ app.post('/admin/api/queue/:slug/generate', adminAuth, async (req, res) => {
   res.json({ success: true, message: `Triggered AI generation for '${cleanSlug}'. Current queue length: ${q.length}` });
 });
 
-// ── ADMIN: Analytics API ───────────────────────────────────────────────────────
+// ── ADMIN: Analytics API & CSV Export ──────────────────────────────────────────
 app.get('/admin/api/analytics', adminAuth, (req, res) => {
   res.json({
     totalScans: analyticsStore.totalScans,
@@ -442,6 +474,17 @@ app.get('/admin/api/analytics', adminAuth, (req, res) => {
     sourceStats: analyticsStore.sourceStats,
     logs: analyticsStore.logs
   });
+});
+
+app.get('/admin/api/analytics/export', adminAuth, (req, res) => {
+  let csv = 'Timestamp,Date,Business Slug,Device Type,Time of Day,Review Engine Source,IP Address\n';
+  analyticsStore.logs.forEach(l => {
+    csv += `"${l.timestamp}","${l.date}","${l.slug}","${l.deviceType}","${l.timeOfDay}","${l.source}","${l.ip}"\n`;
+  });
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=scan_analytics_log.csv');
+  res.status(200).send(csv);
 });
 
 app.delete('/admin/api/analytics/clear', adminAuth, (req, res) => {
@@ -478,7 +521,14 @@ app.get('/admin/api/businesses', adminAuth, (req, res) => {
 
   const list = Array.from(slugs).map(slug => {
     const cfg = getBizConfig(slug);
-    return { slug, ...(cfg || {}) };
+    const hasCustomKey = !!cfg.geminiApiKey;
+    const maskedKey = cfg.geminiApiKey ? (cfg.geminiApiKey.substring(0, 6) + '...' + cfg.geminiApiKey.substring(cfg.geminiApiKey.length - 4)) : null;
+    return {
+      slug,
+      ...(cfg || {}),
+      hasCustomApiKey: hasCustomKey,
+      maskedApiKey: maskedKey
+    };
   });
 
   res.json(list);
@@ -505,7 +555,6 @@ app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
 app.delete('/admin/api/config/:slug', adminAuth, (req, res) => {
   const cleanSlug = sanitizeSlug(req.params.slug);
   
-  // Delete from env and review queue
   delete process.env[`BIZ_${cleanSlug}`];
   delete reviewQueues[cleanSlug];
   delete recentReviews[cleanSlug];
@@ -566,5 +615,5 @@ Object.keys(DEFAULT_BUSINESSES).forEach(slug => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v10.0 (Enterprise Admin Suite) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v11.0 (Enterprise QR Studio & Multi-Language) running on port ${PORT}`);
 });
