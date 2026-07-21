@@ -77,7 +77,7 @@
   <main>
     <div class="icon" id="bizIcon">🛍️</div>
     <h1 id="heading">Opening Google Reviews…</h1>
-    <p class="subtext">Review copied! Redirecting automatically.</p>
+    <p class="subtext" id="subtext">Review copied! Redirecting automatically.</p>
 
     <button class="btn-tap" id="mainBtn" type="button">
       Tap Anywhere if Not Redirected
@@ -143,54 +143,71 @@
     let redirected   = false;
     let redirectAttempted = false;
 
-    // ── ASYNC COPY CLIPBOARD ENGINE (With gesture fallback check) ───────────────
-    async function copyReviewToClipboard(text) {
-      // 1. Try modern clipboard API
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        try {
-          await navigator.clipboard.writeText(text);
+    // ── 100% SYNCHRONOUS CLIPBOARD COPY ENGINE (Ensures iOS/Android reliability in click gesture) ──
+    function copyReviewToClipboardSync(text) {
+      // 1. Legacy textarea selection (The only method that works 100% synchronously on mobile iOS/Android)
+      try {
+        const el = document.createElement('textarea');
+        el.value = text;
+        el.setAttribute('readonly', '');
+        el.style.position = 'absolute';
+        el.style.left = '-9999px';
+        el.style.top = (window.pageYOffset || document.documentElement.scrollTop) + 'px';
+        document.body.appendChild(el);
+        
+        el.select();
+        el.setSelectionRange(0, 999999);
+        
+        const success = document.execCommand('copy');
+        document.body.removeChild(el);
+        if (success) {
           return true;
-        } catch (e) {
-          // Fallback
         }
+      } catch (err) {
+        console.error('execCommand copy failed: ', err);
       }
 
-      // 2. Try legacy input selection method
-      try {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        ta.setSelectionRange(0, 99999); // Safe for mobile Safari/Chrome
-        const success = document.execCommand('copy');
-        document.body.removeChild(ta);
-        if (success) return true;
-      } catch (err) {
-        // Fail
+      // 2. Fallback to async Clipboard API (fired synchronously, letting browser handle internally)
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          navigator.clipboard.writeText(text);
+          return true; 
+        } catch (e) {
+          // ignore
+        }
       }
 
       return false;
     }
 
     // ── SMART REDIRECT ENGINE ──────────────────────────────────────────────────
-    async function attemptRedirect(isUserClicked) {
+    function attemptRedirect(isUserClicked) {
       if (redirected) return;
 
-      const copied = await copyReviewToClipboard(activeReview);
+      // Execute synchronous copy
+      const copied = copyReviewToClipboardSync(activeReview);
 
       if (copied || isUserClicked) {
         redirected = true;
+        
+        // Show status feedback
+        document.getElementById('heading').textContent = "Opening Google Reviews…";
+        document.getElementById('subtext').textContent = "Review copied to clipboard! Paste it on Google Reviews.";
+        const mainBtn = document.getElementById('mainBtn');
+        mainBtn.textContent = "Opening... 🚀";
+        mainBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
+        mainBtn.style.boxShadow = "0 10px 24px rgba(16, 185, 129, 0.4)";
+        
+        // Instant redirect
         window.location.href = googleReviewLink;
       } else {
-        // Copy failed because browser blocked writing without user gesture
+        // Copy was blocked because it ran without a user gesture (i.e. on page load)
         if (!redirectAttempted) {
           redirectAttempted = true;
           document.getElementById('heading').textContent = "Tap to Copy & Continue";
-          document.querySelector('.subtext').textContent = "Review copied! Tap below to open Google Reviews.";
+          document.getElementById('subtext').textContent = "Tap anywhere to copy your 5-star review and redirect.";
           const mainBtn = document.getElementById('mainBtn');
-          mainBtn.textContent = "Tap to Copy & Continue 🚀";
+          mainBtn.textContent = "Copy Review & Redirect 🚀";
           mainBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
           mainBtn.style.boxShadow = "0 10px 24px rgba(16, 185, 129, 0.4)";
         }
