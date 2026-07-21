@@ -208,42 +208,32 @@
     }
 
     // ── SMART REDIRECT ENGINE ──────────────────────────────────────────────────
-    function attemptRedirect(isUserClicked) {
-      if (redirected) return;
-
-      // Execute synchronous copy
-      const copied = copyReviewToClipboardSync(activeReview);
-
-      if (copied || isUserClicked) {
-        redirected = true;
-        
-        // Show status feedback
-        document.getElementById('heading').textContent = "Opening Google Reviews…";
-        document.getElementById('subtext').textContent = "Review copied to clipboard! Paste it on Google Reviews.";
-        const mainBtn = document.getElementById('mainBtn');
-        mainBtn.textContent = "Opening... 🚀";
-        mainBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
-        mainBtn.style.boxShadow = "0 10px 24px rgba(16, 185, 129, 0.4)";
-        
-        // Instant redirect
-        window.location.href = googleReviewLink;
-      } else {
-        // Copy was blocked because it ran without a user gesture (i.e. on page load)
-        if (!redirectAttempted) {
-          redirectAttempted = true;
-          document.getElementById('heading').textContent = "Tap to Copy & Continue";
-          document.getElementById('subtext').textContent = "Tap anywhere to copy your 5-star review and redirect.";
-          const mainBtn = document.getElementById('mainBtn');
-          mainBtn.textContent = "Copy Review & Redirect 🚀";
-          mainBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
-          mainBtn.style.boxShadow = "0 10px 24px rgba(16, 185, 129, 0.4)";
-        }
-      }
-    }
-
     function handleTap() {
-      attemptRedirect(true);
+      if (redirected) return;
+      redirected = true;
+
+      // Copy synchronously inside user gesture
+      copyReviewToClipboardSync(activeReview);
+
+      // Show status feedback
+      document.getElementById('heading').textContent = "Opening Google Reviews…";
+      document.getElementById('subtext').textContent = "Review copied to clipboard! Paste it on Google Reviews.";
+      const mainBtn = document.getElementById('mainBtn');
+      mainBtn.textContent = "Opening... 🚀";
+      mainBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
+      mainBtn.style.boxShadow = "0 10px 24px rgba(16, 185, 129, 0.4)";
+      
+      // Redirect
+      window.location.href = googleReviewLink;
     }
+
+    // Initialize UI on load
+    document.getElementById('heading').textContent = "Tap to Write Review";
+    document.getElementById('subtext').textContent = "Tap anywhere to copy your 5-star review and redirect.";
+    const mainBtn = document.getElementById('mainBtn');
+    mainBtn.textContent = "Copy Review & Continue 🚀";
+    mainBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
+    mainBtn.style.boxShadow = "0 10px 24px rgba(16, 185, 129, 0.4)";
 
     // ── DYNAMICALLY LOAD BUSINESS CONFIG & REVIEW IN PARALLEL ──────────────────
     Promise.all([
@@ -255,8 +245,8 @@
           googleReviewLink = cfg.googleReviewLink.trim();
         }
         if (cfg.name) {
-          document.getElementById('heading').textContent = `Opening ${cfg.name} Reviews…`;
-          document.getElementById('pageTitle').textContent = `Opening ${cfg.name} Reviews…`;
+          document.getElementById('heading').textContent = `Review ${cfg.name}`;
+          document.getElementById('pageTitle').textContent = `Review ${cfg.name}`;
         }
         if (cfg.type) {
           document.getElementById('bizIcon').textContent = getCategoryIcon(cfg.type);
@@ -265,13 +255,9 @@
       if (revData && revData.review) {
         activeReview = revData.review;
       }
-      attemptRedirect(false);
     }).catch(() => {
-      attemptRedirect(false);
+      // do nothing, fall back to default
     });
-
-    // ── SAFETY FALLBACK TIMER (1500ms max in case of network latency) ──────────
-    setTimeout(() => attemptRedirect(false), 1500);
   </script>
 </body>
 </html>
