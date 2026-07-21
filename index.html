@@ -173,41 +173,40 @@
     let redirected   = false;
     let redirectAttempted = false;
 
-    // ── 100% SYNCHRONOUS CLIPBOARD COPY ENGINE (Ensures iOS/Android reliability in click gesture) ──
-    function copyReviewToClipboardSync(text) {
-      // 1. Legacy textarea selection (The only method that works 100% synchronously on mobile iOS/Android)
+    // ── DUAL CLIPBOARD COPY ENGINE (Ensures iOS/Android reliability in click gesture) ──
+    function fallbackCopySync(text) {
       try {
         const el = document.createElement('textarea');
         el.value = text;
-        el.setAttribute('readonly', '');
+        el.addEventListener('keydown', function(e) { e.preventDefault(); });
         el.style.position = 'absolute';
         el.style.left = '-9999px';
         el.style.top = (window.pageYOffset || document.documentElement.scrollTop) + 'px';
         document.body.appendChild(el);
         
+        el.focus();
         el.select();
         el.setSelectionRange(0, 999999);
         
         const success = document.execCommand('copy');
         document.body.removeChild(el);
-        if (success) {
-          return true;
-        }
+        return success;
       } catch (err) {
-        console.error('execCommand copy failed: ', err);
+        console.error('Fallback copy failed: ', err);
+        return false;
       }
+    }
 
-      // 2. Fallback to async Clipboard API (fired synchronously, letting browser handle internally)
+    function copyReviewToClipboard(text) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        try {
-          navigator.clipboard.writeText(text);
-          return true; 
-        } catch (e) {
-          // ignore
-        }
+        return navigator.clipboard.writeText(text)
+          .then(() => true)
+          .catch((err) => {
+            console.warn('Modern copy failed, trying fallback:', err);
+            return fallbackCopySync(text);
+          });
       }
-
-      return false;
+      return Promise.resolve(fallbackCopySync(text));
     }
 
     // ── SMART REDIRECT ENGINE ──────────────────────────────────────────────────
@@ -215,19 +214,20 @@
       if (redirected) return;
       redirected = true;
 
-      // Copy synchronously inside user gesture
-      copyReviewToClipboardSync(activeReview);
-
       // Show status feedback
-      document.getElementById('heading').textContent = "Opening Google Reviews…";
-      document.getElementById('subtext').textContent = "Review copied to clipboard! Paste it on Google Reviews.";
+      document.getElementById('heading').textContent = "Copying Review…";
+      document.getElementById('subtext').textContent = "Review copied! Opening Google Reviews.";
       const mainBtn = document.getElementById('mainBtn');
       mainBtn.textContent = "Opening... 🚀";
       mainBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
       mainBtn.style.boxShadow = "0 10px 24px rgba(16, 185, 129, 0.4)";
       
-      // Redirect
-      window.location.href = googleReviewLink;
+      // Copy to clipboard synchronously in gesture, then redirect inside resolve
+      copyReviewToClipboard(activeReview).then(() => {
+        window.location.href = googleReviewLink;
+      }).catch(() => {
+        window.location.href = googleReviewLink;
+      });
     }
 
     // Initialize UI on load
