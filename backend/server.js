@@ -856,10 +856,14 @@ app.post('/admin/api/config/:slug', adminAuth, async (req, res) => {
 
   process.env[`BIZ_${cleanSlug}`] = JSON.stringify(req.body);
 
-  // Auto generate 5K review bank if missing
+  // 🚀 CLEAR RAM FIFO QUEUE IMMEDIATELY ON NAME EDIT SO OLD NAME REVIEWS ARE DISCARDED
+  fifoQueues[cleanSlug] = [];
+
+  // Auto generate 5K review bank with NEW name
   setImmediate(async () => {
     try {
       await generate5kBankForSlug(cleanSlug, 5000);
+      ensureFifoQueuePrefilled(cleanSlug).catch(() => {});
     } catch {}
   });
 

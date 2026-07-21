@@ -1343,6 +1343,8 @@
       toast(`Business "${body.name}" Updated & Persisted to Turso Cloud DB!`, 'success');
       closeEditModal();
       loadBusinesses();
+      loadStatus();
+      if (document.getElementById('tab-content-bank').style.display !== 'none') loadBankInspector(1);
     } else {
       toast('Failed to update business', 'error');
     }
