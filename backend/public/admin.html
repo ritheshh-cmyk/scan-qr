@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ScanQR Enterprise Studio v11.0</title>
+<title>ScanQR Enterprise Studio v11.1</title>
 <!-- QRCode.js library for Instant QR Generation -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
@@ -308,7 +308,7 @@
 
   <div class="tabs">
     <div class="tab active" onclick="switchTab('status',this)" id="tab-status">📊 Status</div>
-    <div class="tab" onclick="switchTab('qrstudio',this)" id="tab-qrstudio">🎨 QR Studio & Print</div>
+    <div class="tab" onclick="switchTab('qrstudio',this)" id="tab-qrstudio">🎨 QR Studio & Instant Generator</div>
     <div class="tab" onclick="switchTab('queue',this)" id="tab-queue">📥 FIFO Queue Inspector</div>
     <div class="tab" onclick="switchTab('analytics',this)" id="tab-analytics">📈 Analytics</div>
     <div class="tab" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
@@ -341,20 +341,35 @@
       </div>
     </div>
 
-    <!-- ── QR STUDIO & PRINT tab ───────────────────────────── -->
+    <!-- ── QR STUDIO & INSTANT GENERATOR tab ───────────────────── -->
     <div id="tab-content-qrstudio" style="display:none">
       <div class="card">
         <div class="card-header">
-          <h3>🎨 Live QR Code Designer & Print Studio</h3>
+          <h3>🎨 Live QR Code Designer & Instant Generator Studio</h3>
           <button class="btn btn-success btn-sm" onclick="openPrintModal()">🖨️ Print Counter Stand</button>
+        </div>
+
+        <div style="margin-bottom:16px;display:flex;gap:12px;background:var(--bg);padding:6px;border-radius:10px;border:1px solid var(--border);width:fit-content">
+          <label style="font-size:0.85rem;cursor:pointer;padding:6px 12px;border-radius:6px;" id="mode-registered-lbl">
+            <input type="radio" name="qrMode" value="registered" checked onchange="switchQrMode(this.value)"> 🏪 Registered Business
+          </label>
+          <label style="font-size:0.85rem;cursor:pointer;padding:6px 12px;border-radius:6px;" id="mode-custom-lbl">
+            <input type="radio" name="qrMode" value="custom" onchange="switchQrMode(this.value)"> ⚡ Instant Custom URL/Link
+          </label>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start">
           <div style="display:grid;gap:14px">
-            <div>
+            <div id="registeredSelectBox">
               <label style="font-size:0.85rem;color:var(--muted)">Select Business</label>
               <select id="qrBizSelect" onchange="renderQrStudio()"></select>
             </div>
+
+            <div id="customUrlBox" style="display:none">
+              <label style="font-size:0.85rem;color:var(--muted)">Paste Any Custom URL / Link / Text</label>
+              <input id="qrCustomInput" type="url" placeholder="https://search.google.com/local/writereview?placeid=YOUR_ID or https://yourdomain.com" oninput="renderQrStudio()">
+            </div>
+
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div>
                 <label style="font-size:0.85rem;color:var(--muted)">QR Dark Color</label>
@@ -366,15 +381,16 @@
               </div>
             </div>
             <div>
-              <label style="font-size:0.85rem;color:var(--muted)">Target Target URL (Vercel Frontend)</label>
-              <input id="qrTargetUrl" type="text" readonly style="opacity:0.7">
+              <label style="font-size:0.85rem;color:var(--muted)">Active Target URL</label>
+              <input id="qrTargetUrl" type="text" readonly style="opacity:0.75;font-weight:600;color:var(--accent2)">
             </div>
           </div>
 
           <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center">
             <div id="qrCanvasContainer" style="display:inline-block;padding:12px;background:#fff;border-radius:12px;margin-bottom:14px"></div>
-            <div style="display:flex;gap:8px;justify-content:center">
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
               <button class="btn btn-primary btn-sm" onclick="downloadQrPng()">📥 Download PNG</button>
+              <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('qrTargetUrl').value);toast('URL Copied!','success')">📋 Copy Link</button>
             </div>
           </div>
         </div>
@@ -596,6 +612,7 @@
   let autoTimer   = null;
   let cachedLogs  = [];
   let qrObj       = null;
+  let currentQrMode = 'registered';
 
   // ── Auth ────────────────────────────────────────────────────────────────────
   async function login(providedKey) {
@@ -741,9 +758,22 @@
     } catch {}
   }
 
+  function switchQrMode(mode) {
+    currentQrMode = mode;
+    document.getElementById('registeredSelectBox').style.display = mode === 'registered' ? 'block' : 'none';
+    document.getElementById('customUrlBox').style.display        = mode === 'custom'     ? 'block' : 'none';
+    renderQrStudio();
+  }
+
   async function renderQrStudio() {
-    const slug = document.getElementById('qrBizSelect').value || 'saloon';
-    const targetUrl = `https://scanqr-beta.vercel.app?biz=${slug}`;
+    let targetUrl = '';
+    if (currentQrMode === 'registered') {
+      const slug = document.getElementById('qrBizSelect').value || 'saloon';
+      targetUrl = `https://scanqr-beta.vercel.app?biz=${slug}`;
+    } else {
+      targetUrl = document.getElementById('qrCustomInput').value.trim() || 'https://scanqr-beta.vercel.app';
+    }
+
     document.getElementById('qrTargetUrl').value = targetUrl;
 
     const darkColor  = document.getElementById('qrDarkColor').value || '#6c63ff';
@@ -765,7 +795,7 @@
   function downloadQrPng() {
     const canvas = document.querySelector('#qrCanvasContainer canvas');
     if (!canvas) { toast('QR Code not ready', 'error'); return; }
-    const slug = document.getElementById('qrBizSelect').value || 'qr';
+    const slug = currentQrMode === 'registered' ? (document.getElementById('qrBizSelect').value || 'qr') : 'custom_qr';
     const link = document.createElement('a');
     link.download = `ScanQR_${slug}.png`;
     link.href = canvas.toDataURL('image/png');
@@ -774,10 +804,18 @@
   }
 
   function openPrintModal() {
-    const slug = document.getElementById('qrBizSelect').value || 'saloon';
-    const targetUrl = `https://scanqr-beta.vercel.app?biz=${slug}`;
+    let targetUrl = '';
+    let title = 'ScanQR Review';
+    if (currentQrMode === 'registered') {
+      const slug = document.getElementById('qrBizSelect').value || 'saloon';
+      targetUrl = `https://scanqr-beta.vercel.app?biz=${slug}`;
+      title = slug.toUpperCase().replace(/_/g, ' ');
+    } else {
+      targetUrl = document.getElementById('qrCustomInput').value.trim() || 'https://scanqr-beta.vercel.app';
+      title = 'Custom Target Review';
+    }
     
-    document.getElementById('printTitle').textContent = slug.toUpperCase().replace(/_/g, ' ');
+    document.getElementById('printTitle').textContent = title;
     const printContainer = document.getElementById('printQrContainer');
     printContainer.innerHTML = '';
 
