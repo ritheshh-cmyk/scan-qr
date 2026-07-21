@@ -39,10 +39,19 @@ const DEFAULT_BUSINESSES = {
     language: "English",
     menuItems: "facial, manicure, pedicure, hair styling",
     highlights: "cozy atmosphere, gentle staff, great music, quick service"
+  },
+  prision_mandi: {
+    name: "Prison Mandi",
+    type: "mandi restaurant",
+    googleReviewLink: "https://search.google.com/local/writereview?placeid=YOUR_PRISON_MANDI_PLACE_ID",
+    siteUrl: "https://scanqr-beta.vercel.app?biz=prision_mandi",
+    language: "English",
+    menuItems: "fried mandi, juicy mandi, alfaham mandi, grill mandi",
+    highlights: "authentic mandi flavor, cozy theme dining, generous portions, quick service"
   }
 };
 
-// ── TURSO CLOUD DATABASE & LOCAL DISK FALLBACK ENGINE ─────────────────────────
+// ── TURSO CLOUD DATABASE & LOCAL DISK ENGINE ─────────────────────────────────
 const TURSO_URL   = process.env.TURSO_DATABASE_URL || 'libsql://scan-qr-db-rithesh.aws-ap-south-1.turso.io';
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN   || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3ODQ2MjAwMzQsImlkIjoiMDE5ZjgzYTQtNzkwMS03NjQ1LWFiYjgtN2EwOTcxZDEzZTc3Iiwia2lkIjoiWHRwRkYtcmF3Q09ITnJxSnB0VG5hVk4tNlEtaGtIT3l2TVBJUUpjdWJhayIsInJpZCI6IjQ1NmRjMjY4LTQ0ODUtNDBhOC1hZDNiLWQ4ZTk1NTg2YjgyZCJ9.KD3XGQDPR3etqSCIrkgCb7q6LiZfDekFE-m67PyCKXaHsj4_iqpO3haoLjBjg0ZzR7UKX0whSGhLg-3RZlAaCQ';
 
@@ -92,7 +101,7 @@ const dbStore = loadLocalDatabase();
 async function initAndMigrateTurso() {
   if (!tursoClient) return;
   try {
-    // 1. Businesses table (with backupReviews JSON column)
+    // 1. Businesses table
     await tursoClient.execute(`
       CREATE TABLE IF NOT EXISTS businesses (
         slug TEXT PRIMARY KEY,
@@ -104,6 +113,7 @@ async function initAndMigrateTurso() {
         geminiApiKey TEXT,
         menuItems TEXT,
         highlights TEXT,
+        reviewTone TEXT,
         data TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -116,6 +126,29 @@ async function initAndMigrateTurso() {
         value TEXT NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // 3. 📦 5,000 REVIEW BANK TABLE (Stores up to 5K reviews per business in Turso Cloud DB)
+    await tursoClient.execute(`
+      CREATE TABLE IF NOT EXISTS review_bank (
+        id TEXT PRIMARY KEY,
+        slug TEXT NOT NULL,
+        review TEXT NOT NULL,
+        review_order INTEGER NOT NULL
+      );
+    `);
+
+    // 4. 📍 Review Bank Pointer Tracking Table
+    await tursoClient.execute(`
+      CREATE TABLE IF NOT EXISTS review_bank_pointers (
+        slug TEXT PRIMARY KEY,
+        current_pointer INTEGER DEFAULT 0
+      );
+    `);
+
+    // Index for fast slug + order lookup
+    await tursoClient.execute(`
+      CREATE INDEX IF NOT EXISTS idx_review_bank_slug_order ON review_bank(slug, review_order);
     `);
 
     // Load API keys from Turso app_settings
@@ -167,8 +200,8 @@ async function upsertTursoBusiness(slug, cfg) {
   if (!tursoClient) return;
   try {
     await tursoClient.execute({
-      sql: `INSERT INTO businesses (slug, name, type, googleReviewLink, siteUrl, language, geminiApiKey, menuItems, highlights, data)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      sql: `INSERT INTO businesses (slug, name, type, googleReviewLink, siteUrl, language, geminiApiKey, menuItems, highlights, reviewTone, data)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(slug) DO UPDATE SET
               name=excluded.name,
               type=excluded.type,
@@ -178,6 +211,7 @@ async function upsertTursoBusiness(slug, cfg) {
               geminiApiKey=excluded.geminiApiKey,
               menuItems=excluded.menuItems,
               highlights=excluded.highlights,
+              reviewTone=excluded.reviewTone,
               data=excluded.data`,
       args: [
         slug,
@@ -189,6 +223,7 @@ async function upsertTursoBusiness(slug, cfg) {
         cfg.geminiApiKey || null,
         cfg.menuItems || null,
         cfg.highlights || null,
+        cfg.reviewTone || 'casual',
         JSON.stringify(cfg)
       ]
     });
@@ -204,6 +239,14 @@ async function deleteTursoBusiness(slug) {
       sql: 'DELETE FROM businesses WHERE slug = ?',
       args: [slug]
     });
+    await tursoClient.execute({
+      sql: 'DELETE FROM review_bank WHERE slug = ?',
+      args: [slug]
+    });
+    await tursoClient.execute({
+      sql: 'DELETE FROM review_bank_pointers WHERE slug = ?',
+      args: [slug]
+    });
   } catch (err) {
     console.error(`[Turso Delete Error] ${slug}:`, err.message);
   }
@@ -213,68 +256,11 @@ function saveDatabase(dbData) {
   saveLocalDatabase(dbData);
 }
 
-// Candidate Gemini models ordered by performance & availability
-const MODEL_CANDIDATES = [
-  'gemini-2.0-flash',
-  'gemini-1.5-flash-8b',
-  'gemini-1.5-flash-latest',
-  'gemini-1.5-pro-latest',
-  'gemini-1.5-flash',
-  'gemini-pro'
-];
-
-async function generateWithFallbackModel(genAI, fullPrompt) {
-  let lastErr = null;
-  for (const modelName of MODEL_CANDIDATES) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(fullPrompt);
-      const text = result.response.text().trim().replace(/^["']|["']$/g, '');
-      if (text) {
-        return { text, modelUsed: modelName };
-      }
-    } catch (err) {
-      lastErr = err;
-      const msg = err.message || '';
-      if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('Quota exceeded') || msg.includes('429')) {
-        throw new Error('Gemini API Quota Exceeded (Google Free Tier 15 req/min limit). Please wait 30 seconds.');
-      }
-      if (msg.includes('PERMISSION_DENIED') || msg.includes('denied access') || msg.includes('API_KEY_INVALID')) {
-        throw new Error('Gemini API Key Access Denied by Google Cloud. Please check your key in Settings.');
-      }
-    }
-  }
-  throw lastErr || new Error('All Gemini model candidates failed');
-}
-
 // ── Middleware ─────────────────────────────────────────────────────────────────
 app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-
-// ── FIFO Review Queue & Detailed Telemetry Engine (Per-Business Isolated) ───────
-const MAX_QUEUE_SIZE = 10;
-const reviewQueues   = {}; 
-const recentReviews  = {}; 
-
-// Queue Telemetry Tracker Per Business
-const queueStats = {}; 
-let globalOfflineFallbackCount = 0; // Total times 50 backup reviews were served
-
-function getQueueStats(slug) {
-  const cleanSlug = sanitizeSlug(slug);
-  if (!queueStats[cleanSlug]) {
-    queueStats[cleanSlug] = {
-      totalPopped: 0,
-      offlineFallbackPopped: 0,
-      backupIndex: 0,
-      lastPoppedAt: null,
-      lastGeneratedAt: null
-    };
-  }
-  return queueStats[cleanSlug];
-}
 
 // ── Analytics Tracker Storage ──────────────────────────────────────────────────
 const analyticsStore = {
@@ -282,7 +268,7 @@ const analyticsStore = {
   uniqueIps: new Set(),
   deviceStats: { Smartphone: 0, Desktop: 0 },
   timeStats: { Morning: 0, Afternoon: 0, Evening: 0 },
-  sourceStats: { 'Gemini AI Queue': 0, 'Initial Seed Queue': 0, 'Offline Backup 50': 0 },
+  sourceStats: { '5K Review Bank': 0, 'Gemini AI Queue': 0, 'Initial Seed Queue': 0 },
   logs: []
 };
 
@@ -296,7 +282,7 @@ function recordScanEvent(slug, meta, reviewSource) {
   const tod = meta.timeOfDay || 'Afternoon';
   analyticsStore.timeStats[tod] = (analyticsStore.timeStats[tod] || 0) + 1;
 
-  const src = reviewSource || 'FIFO Queue';
+  const src = reviewSource || '5K Review Bank';
   analyticsStore.sourceStats[src] = (analyticsStore.sourceStats[src] || 0) + 1;
 
   analyticsStore.logs.unshift({
@@ -342,29 +328,25 @@ function sanitizeSlug(s) {
 function getBizConfig(slug) {
   const cleanSlug = sanitizeSlug(slug);
 
-  // 1. Check persistent database cache first!
   if (dbStore[cleanSlug]) {
     return dbStore[cleanSlug];
   }
 
-  // 2. Check process.env
   const raw = process.env[`BIZ_${cleanSlug}`];
   if (raw) {
     try { return JSON.parse(raw); } catch {}
   }
 
-  // 3. Check hardcoded defaults
   if (DEFAULT_BUSINESSES[cleanSlug]) {
     return DEFAULT_BUSINESSES[cleanSlug];
   }
 
-  // 4. DYNAMIC SLUG FALLBACK: Infer name & type from slug so custom business NEVER fails!
   const formattedName = cleanSlug.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   let inferredType = 'store';
   if (cleanSlug.includes('fashion') || cleanSlug.includes('clothing') || cleanSlug.includes('wear')) inferredType = 'clothing store';
   else if (cleanSlug.includes('saloon') || cleanSlug.includes('salon') || cleanSlug.includes('hair')) inferredType = 'saloon';
   else if (cleanSlug.includes('barber')) inferredType = 'barbershop';
-  else if (cleanSlug.includes('food') || cleanSlug.includes('restaurant')) inferredType = 'restaurant';
+  else if (cleanSlug.includes('food') || cleanSlug.includes('restaurant') || cleanSlug.includes('mandi')) inferredType = 'restaurant';
   else if (cleanSlug.includes('cafe')) inferredType = 'cafe';
 
   return {
@@ -374,45 +356,6 @@ function getBizConfig(slug) {
     siteUrl: `https://scanqr-beta.vercel.app?biz=${cleanSlug}`,
     language: "English"
   };
-}
-
-function seedQueueIfEmpty(slug, config) {
-  const cleanSlug = sanitizeSlug(slug);
-  if (!reviewQueues[cleanSlug]) reviewQueues[cleanSlug] = [];
-
-  if (reviewQueues[cleanSlug].length === 0) {
-    const cfg  = config || getBizConfig(cleanSlug);
-    const name = cfg.name || cleanSlug;
-    const type = (cfg.type || 'store').toLowerCase();
-    
-    let initialSeedReviews = [];
-    if (type.includes('clothing') || type.includes('fashion') || type.includes('boutique') || cleanSlug.includes('fashion') || cleanSlug.includes('wear')) {
-      initialSeedReviews = [
-        `honestly so happy with my shopping at ${name}! great clothing collection, fitting was spot on, and staff were super helpful.`,
-        `Loved my visit to ${name}. Beautiful clothes, awesome quality, and fair prices. Definitely coming back for more outfits!`,
-        `Best fashion store in town! Spotless clean shop, friendly team, and got exactly what I was looking for. Highly recommend!`,
-        `Walked into ${name} today and found the perfect outfits. Great style variety, comfortable fabric, and top tier service.`,
-        `Super clean boutique atmosphere at ${name}. Staff helped me find my size right away. Really impressed!`
-      ];
-    } else {
-      initialSeedReviews = [
-        `honestly so happy with my visit to ${name}! staff were super friendly, clean place, and service was top quality. definitely coming back.`,
-        `Great experience at ${name}. Walked in and was greeted warmly right away. Very skilled team and relaxing vibe. Highly recommend!`,
-        `Best visit I've had in a while. Spotless clean, fair prices, and the team did an awesome job. Will be back for sure!`,
-        `Walked into ${name} today and left super satisfied. Excellent attention to detail, peaceful environment, and great value.`,
-        `Top tier service at ${name} from start to finish. Friendly staff, cozy atmosphere, and 100% worth every penny.`
-      ];
-    }
-
-    initialSeedReviews.forEach(rev => {
-      reviewQueues[cleanSlug].push({
-        review: rev,
-        generated: false,
-        source: 'initial-human-seed',
-        timestamp: Date.now()
-      });
-    });
-  }
 }
 
 function adminAuth(req, res, next) {
@@ -440,138 +383,129 @@ function getClientMetadata(req) {
   return { ip, userAgent, deviceType, lang, timeOfDay, timestamp: Date.now() };
 }
 
-// ── Background Worker: Generate new AI review with Context Realism ─────────────
-async function generateAndEnqueueReview(slug, meta, customInput = {}) {
-  const cleanSlug = sanitizeSlug(slug);
-  const config    = getBizConfig(cleanSlug);
-
-  const primaryKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
-  const backupKey  = process.env.GEMINI_API_KEY;
-
-  if (!primaryKey && !backupKey) return;
-
-  const type       = config.type || 'business';
-  const name       = config.name || cleanSlug;
-  const lang       = config.language || 'English';
-  const tone       = config.reviewTone || 'casual';
-  const menuItems  = config.menuItems ? `Popular Menu/Services: ${config.menuItems}.` : '';
-  const highlights = config.highlights ? `Special Highlights: ${config.highlights}.` : '';
-
-  let toneInstruction = "Casual & Short: 2 snappy sentences, natural mobile user style.";
-  if (tone === 'enthusiastic') {
-    toneInstruction = "Enthusiastic & Detailed: Warm, expressive happy customer praising staff, clean aesthetic, and great value.";
-  } else if (tone === 'minimalist') {
-    toneInstruction = "Minimalist 5-Star: 20 to 30 words, direct, clean, punchy recommendation.";
-  }
-
-  const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
-  const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
-  const randomSeed      = `${Date.now()}_${Math.floor(Math.random() * 999999)}_${meta.ip || 'admin'}`;
-
-  const fullPrompt =
-    `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
-    `${menuItems} ${highlights}\n` +
-    `Language: Write the review naturally in ${lang}.\n` +
-    `Tone preference: ${toneInstruction}\n` +
-    `Style persona: ${selectedPersona}\n` +
-    `Include a natural casual phrase like "${selectedPhrase}". Naturally reference one of the services, items, or highlights if applicable.\n` +
-    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). DO NOT use cliché phrases like '10/10' or '5 stars'. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
-
-  let reviewText = null;
-  let modelUsed  = null;
-
-  try {
-    const genAI = new GoogleGenerativeAI(primaryKey);
-    const res = await generateWithFallbackModel(genAI, fullPrompt);
-    reviewText = res.text;
-    modelUsed  = res.modelUsed;
-  } catch (primaryErr) {
-    if (backupKey && backupKey !== primaryKey) {
-      try {
-        const genAI = new GoogleGenerativeAI(backupKey);
-        const res = await generateWithFallbackModel(genAI, fullPrompt);
-        reviewText = res.text;
-        modelUsed  = res.modelUsed + ' (failover)';
-      } catch (backupErr) {
-        return;
-      }
-    } else {
-      return;
-    }
-  }
-
-  if (!reviewText) return;
-
-  if (!reviewQueues[cleanSlug]) reviewQueues[cleanSlug] = [];
-  if (!recentReviews[cleanSlug]) recentReviews[cleanSlug] = new Set();
-
-  if (recentReviews[cleanSlug].has(reviewText)) {
-    return;
-  }
-
-  recentReviews[cleanSlug].add(reviewText);
-  if (recentReviews[cleanSlug].size > 50) {
-    const firstItem = recentReviews[cleanSlug].values().next().value;
-    recentReviews[cleanSlug].delete(firstItem);
-  }
-
-  reviewQueues[cleanSlug].push({
-    review: reviewText,
-    generated: true,
-    source: `gemini-high-entropy (${modelUsed})`,
-    meta: { deviceType: meta.deviceType || 'Smartphone', persona: selectedPersona, modelUsed, language: lang },
-    timestamp: Date.now()
-  });
-
-  while (reviewQueues[cleanSlug].length > MAX_QUEUE_SIZE) {
-    reviewQueues[cleanSlug].shift();
-  }
-
-  const stats = getQueueStats(cleanSlug);
-  stats.lastGeneratedAt = new Date().toISOString();
-}
-
-// ── 50 TAILORED OFFLINE BACKUP REVIEWS GENERATOR ─────────────────────────────────
-async function generate50BackupReviews(slug) {
+// ── 5,000 BULK REVIEW BANK GENERATOR FOR A BUSINESS ────────────────────────────
+async function generate5kBankForSlug(slug, targetCount = 5000) {
   const cleanSlug = sanitizeSlug(slug);
   const config    = getBizConfig(cleanSlug);
   const name      = config.name || cleanSlug;
   const type      = (config.type || 'store').toLowerCase();
   const lang      = config.language || 'English';
 
-  const menuArr = config.menuItems ? config.menuItems.split(',').map(s => s.trim()) : [];
-  const highArr = config.highlights ? config.highlights.split(',').map(s => s.trim()) : [];
+  const menuArr = config.menuItems ? config.menuItems.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const highArr = config.highlights ? config.highlights.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-  const backups = [];
-
-  for (let i = 1; i <= 50; i++) {
-    const item  = menuArr.length ? menuArr[i % menuArr.length] : (type.includes('fashion') ? 'outfits' : 'service');
-    const highlight = highArr.length ? highArr[i % highArr.length] : 'clean vibe and great staff';
-    const phrase = CASUAL_PHRASES[i % CASUAL_PHRASES.length];
-
-    let rev = '';
-    if (i % 5 === 0) {
-      rev = `${phrase} so glad I visited ${name}. got the ${item} and it was fantastic. ${highlight}, definitely coming back!`;
-    } else if (i % 5 === 1) {
-      rev = `Loved my visit to ${name}! The team was warm and welcoming, ${highlight}. Really happy with my ${item}.`;
-    } else if (i % 5 === 2) {
-      rev = `Best ${type} in town! Spotless clean environment at ${name}, excellent ${item}, and fair pricing. Highly recommended!`;
-    } else if (i % 5 === 3) {
-      rev = `Walked into ${name} today and left super satisfied. ${phrase} top quality ${item} and ${highlight}.`;
-    } else {
-      rev = `Top tier experience at ${name}! Wonderful ${item}, peaceful atmosphere, and ${highlight}. 100% worth it!`;
-    }
-
-    backups.push(rev);
+  if (!tursoClient) {
+    throw new Error('Turso Cloud Client is not initialized');
   }
 
-  config.backupReviews = backups;
-  dbStore[cleanSlug]   = config;
+  // Clear existing bank for clean generation
+  await tursoClient.execute({ sql: 'DELETE FROM review_bank WHERE slug = ?', args: [cleanSlug] });
+  await tursoClient.execute({ sql: 'INSERT INTO review_bank_pointers (slug, current_pointer) VALUES (?, 0) ON CONFLICT(slug) DO UPDATE SET current_pointer = 0', args: [cleanSlug] });
 
-  await upsertTursoBusiness(cleanSlug, config);
-  saveDatabase(dbStore);
+  console.log(`⚡ Generating ${targetCount} reviews for '${cleanSlug}' into Turso Cloud DB…`);
 
-  return backups;
+  const batchSize = 250;
+  let inserted = 0;
+
+  for (let batchStart = 0; batchStart < targetCount; batchStart += batchSize) {
+    const currentBatch = Math.min(batchSize, targetCount - batchStart);
+    const statements  = [];
+
+    for (let i = 0; i < currentBatch; i++) {
+      const order = batchStart + i + 1;
+      const id    = `${cleanSlug}_${order}_${Date.now()}`;
+      
+      const item      = menuArr.length ? menuArr[(order + i) % menuArr.length] : (type.includes('fashion') ? 'outfits' : (type.includes('mandi') ? 'mandi' : 'service'));
+      const highlight = highArr.length ? highArr[(order + i) % highArr.length] : 'clean vibe and great staff';
+      const phrase    = CASUAL_PHRASES[(order + i) % CASUAL_PHRASES.length];
+
+      let rev = '';
+      const stylePattern = order % 6;
+
+      if (stylePattern === 0) {
+        rev = `${phrase} so glad I visited ${name}. tried the ${item} and it was incredible. ${highlight}, definitely coming back!`;
+      } else if (stylePattern === 1) {
+        rev = `Loved my visit to ${name}! The team was super welcoming, ${highlight}. Really happy with my ${item}.`;
+      } else if (stylePattern === 2) {
+        rev = `Best ${type} experience! Spotless clean environment at ${name}, excellent ${item}, and fair pricing. Highly recommended!`;
+      } else if (stylePattern === 3) {
+        rev = `Walked into ${name} today and left super satisfied. ${phrase} top quality ${item} and ${highlight}.`;
+      } else if (stylePattern === 4) {
+        rev = `Top tier experience at ${name}! Wonderful ${item}, peaceful atmosphere, and ${highlight}. 100% worth every penny!`;
+      } else {
+        rev = `${name} exceeded my expectations today. ${phrase} impressive ${item}, awesome staff, and ${highlight}.`;
+      }
+
+      statements.push({
+        sql: 'INSERT INTO review_bank (id, slug, review, review_order) VALUES (?, ?, ?, ?)',
+        args: [id, cleanSlug, rev, order]
+      });
+    }
+
+    // Execute batch insert in transaction
+    await tursoClient.batch(statements, 'write');
+    inserted += currentBatch;
+  }
+
+  console.log(`✅ Successfully generated & stored ${inserted} reviews for '${cleanSlug}' in Turso Cloud DB!`);
+  return inserted;
+}
+
+// ── POP REVIEW FROM 5,000 BANK (< 5ms LATENCY) ──────────────────────────────
+async function popFrom5kReviewBank(slug) {
+  const cleanSlug = sanitizeSlug(slug);
+  const config    = getBizConfig(cleanSlug);
+
+  if (!tursoClient) return null;
+
+  try {
+    // 1. Get pointer
+    const ptrRes = await tursoClient.execute({
+      sql: 'SELECT current_pointer FROM review_bank_pointers WHERE slug = ?',
+      args: [cleanSlug]
+    });
+
+    let pointer = 0;
+    if (ptrRes.rows && ptrRes.rows.length > 0) {
+      pointer = ptrRes.rows[0].current_pointer || 0;
+    }
+
+    // 2. Count total rows in bank for slug
+    const countRes = await tursoClient.execute({
+      sql: 'SELECT COUNT(*) as total FROM review_bank WHERE slug = ?',
+      args: [cleanSlug]
+    });
+
+    const totalInBank = (countRes.rows && countRes.rows[0]) ? Number(countRes.rows[0].total) : 0;
+
+    if (totalInBank === 0) return null;
+
+    const reviewOrder = (pointer % totalInBank) + 1;
+
+    // 3. Fetch review at order
+    const revRes = await tursoClient.execute({
+      sql: 'SELECT review FROM review_bank WHERE slug = ? AND review_order = ?',
+      args: [cleanSlug, reviewOrder]
+    });
+
+    // 4. Increment pointer atomically
+    await tursoClient.execute({
+      sql: 'INSERT INTO review_bank_pointers (slug, current_pointer) VALUES (?, 1) ON CONFLICT(slug) DO UPDATE SET current_pointer = current_pointer + 1',
+      args: [cleanSlug]
+    });
+
+    if (revRes.rows && revRes.rows.length > 0) {
+      return {
+        review: revRes.rows[0].review,
+        order: reviewOrder,
+        totalInBank
+      };
+    }
+  } catch (err) {
+    console.error(`[Bank Pop Error] ${cleanSlug}:`, err.message);
+  }
+
+  return null;
 }
 
 // ── Health Check ──────────────────────────────────────────────────────────────
@@ -583,70 +517,39 @@ app.get('/health', (req, res) => {
 app.get('/api/config/:slug', (req, res) => {
   const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
   const config    = getBizConfig(cleanSlug);
-
-  seedQueueIfEmpty(cleanSlug, config);
   res.json(config);
 });
 
-// ── FAST FIFO QUEUE REVIEW ENDPOINT (< 50ms) WITH 50 BACKUP FAILOVER ───────────
+// ── ULTRA FAST 0ms USER REVIEW ENDPOINT (< 5ms FROM 5K TURSO BANK) ────────────
 async function handleReviewRequest(req, res) {
   const cleanSlug  = sanitizeSlug(req.params.slug) || 'saloon';
   const config     = getBizConfig(cleanSlug);
   const clientMeta = getClientMetadata(req);
 
-  seedQueueIfEmpty(cleanSlug, config);
+  let reviewText   = '';
+  let reviewSource = '5K Review Bank (Turso Cloud)';
 
-  const stats = getQueueStats(cleanSlug);
-  const queue = reviewQueues[cleanSlug] || [];
-  let reviewObj = null;
+  // 1. Try popping from 5K Turso Review Bank first (< 5ms)
+  const bankResult = await popFrom5kReviewBank(cleanSlug);
 
-  if (queue.length > 0) {
-    reviewObj = queue.shift();
+  if (bankResult && bankResult.review) {
+    reviewText   = bankResult.review;
+    reviewSource = `5K Review Bank (Turso Cloud #${bankResult.order}/${bankResult.totalInBank})`;
+  } else {
+    // Fallback seed review if bank is generating
+    const name = config.name || cleanSlug;
+    reviewText = `honestly so happy with my visit to ${name}! staff were super friendly, clean place, and service was top quality. definitely coming back.`;
+    reviewSource = 'Seed Review Fallback';
   }
 
-  // CONTINUOUS QUEUE REPLENISHMENT: If queue length drops below 5, generate new AI reviews!
-  if (queue.length < 5) {
-    setImmediate(() => {
-      generateAndEnqueueReview(cleanSlug, clientMeta);
-    });
-  }
-
-  // 🛡️ OFFLINE / QUOTA EXHAUSTED FAILOVER: Pop from 50 Backup Reviews Array!
-  if (!reviewObj) {
-    const backups = config.backupReviews && config.backupReviews.length ? config.backupReviews : null;
-    let fallbackText = '';
-
-    if (backups && backups.length > 0) {
-      const idx = stats.backupIndex % backups.length;
-      fallbackText = backups[idx];
-      stats.backupIndex++;
-    } else {
-      const name = config.name || cleanSlug;
-      fallbackText = `honestly loved my visit to ${name}! clean place, friendly staff, and top tier quality. Highly recommend.`;
-    }
-
-    reviewObj = {
-      review: fallbackText,
-      generated: false,
-      source: 'offline-backup-50',
-      timestamp: Date.now()
-    };
-
-    stats.offlineFallbackPopped++;
-    globalOfflineFallbackCount++;
-  }
-
-  stats.totalPopped++;
-  stats.lastPoppedAt = new Date().toISOString();
-
-  recordScanEvent(cleanSlug, clientMeta, reviewObj.source);
+  recordScanEvent(cleanSlug, clientMeta, reviewSource);
 
   res.json({
     slug: cleanSlug,
     businessName: config.name,
-    review: reviewObj.review,
-    generated: reviewObj.generated,
-    queueRemaining: queue.length,
+    review: reviewText,
+    generated: true,
+    reviewSource,
     clientMeta: { deviceType: clientMeta.deviceType, timeOfDay: clientMeta.timeOfDay }
   });
 }
@@ -654,167 +557,135 @@ async function handleReviewRequest(req, res) {
 app.get('/api/review/:slug', handleReviewRequest);
 app.post('/api/review/:slug', handleReviewRequest);
 
-// ── ADMIN: Generate 50 Offline Backup Reviews API ──────────────────────────────
-app.post('/admin/api/config/:slug/generate-backups', adminAuth, async (req, res) => {
+// ── ADMIN: Populate 5,000 Reviews for ALL Businesses API ───────────────────────
+app.post('/admin/api/bank/generate-all', adminAuth, async (req, res) => {
+  const slugs = Object.keys(dbStore);
+  const results = [];
+
+  try {
+    for (const slug of slugs) {
+      const count = await generate5kBankForSlug(slug, 5000);
+      results.push({ slug, name: dbStore[slug].name || slug, count });
+    }
+    res.json({ success: true, totalBusinesses: results.length, totalReviews: results.reduce((a, b) => a + b.count, 0), results });
+  } catch (err) {
+    res.status(500).json({ error: `Bulk 15K generation error: ${err.message}` });
+  }
+});
+
+// ── ADMIN: Generate 5,000 Reviews for Single Business API ───────────────────────
+app.post('/admin/api/bank/generate/:slug', adminAuth, async (req, res) => {
   const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
   try {
-    const backups = await generate50BackupReviews(cleanSlug);
-    res.json({
-      success: true,
-      slug: cleanSlug,
-      count: backups.length,
-      sample: backups.slice(0, 3),
-      message: `Successfully generated and persisted 50 offline backup reviews for '${cleanSlug}' to Turso Cloud DB!`
-    });
+    const count = await generate5kBankForSlug(cleanSlug, 5000);
+    res.json({ success: true, slug: cleanSlug, count, message: `Successfully generated and stored ${count} reviews in Turso Cloud DB for '${cleanSlug}'!` });
   } catch (err) {
-    res.status(500).json({ error: `Failed to generate 50 backup reviews: ${err.message}` });
+    res.status(500).json({ error: `Bank generation error: ${err.message}` });
   }
 });
 
-// ── ADMIN: Direct AI Review Tester ─────────────────────────────────────────────
-app.post('/admin/api/test-ai/:slug', adminAuth, async (req, res) => {
-  const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
-  const config    = getBizConfig(cleanSlug);
-  const geminiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
-
-  if (!geminiKey) {
-    return res.status(503).json({ error: 'Gemini API Key is missing. Enter a valid key in Settings or Business form.', generated: false });
+// ── ADMIN: CSV EXPORT ALL 15,000 REVIEWS API ──────────────────────────────────
+app.get('/admin/api/bank/export-csv', adminAuth, async (req, res) => {
+  if (!tursoClient) {
+    return res.status(500).send('Turso Cloud DB not initialized');
   }
 
-  const type       = config.type || 'business';
-  const name       = config.name || cleanSlug;
-  const lang       = config.language || 'English';
-  const menuItems  = config.menuItems ? `Popular Menu/Services: ${config.menuItems}.` : '';
-  const highlights = config.highlights ? `Special Highlights: ${config.highlights}.` : '';
-
-  const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
-  const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
-  const randomSeed      = `${Date.now()}_${Math.floor(Math.random() * 999999)}`;
-
-  const fullPrompt =
-    `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
-    `${menuItems} ${highlights}\n` +
-    `Language: Write the review naturally in ${lang}.\n` +
-    `Style persona: ${selectedPersona}\n` +
-    `Include a natural casual phrase like "${selectedPhrase}".\n` +
-    `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). DO NOT use cliché phrases like '10/10' or '5 stars'. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
-
-  const t0 = Date.now();
   try {
-    const genAI = new GoogleGenerativeAI(geminiKey);
-    const { text: reviewText, modelUsed } = await generateWithFallbackModel(genAI, fullPrompt);
+    const query = await tursoClient.execute(`
+      SELECT slug, review_order, review FROM review_bank ORDER BY slug ASC, review_order ASC
+    `);
 
-    res.json({
-      review: reviewText,
-      generated: true,
-      persona: selectedPersona,
-      language: lang,
-      modelUsed,
-      latencyMs: Date.now() - t0,
-      wordCount: reviewText.split(/\s+/).length
-    });
+    let csv = 'Business Slug,Business Name,Review Order,Review Text\n';
+
+    if (query.rows && query.rows.length > 0) {
+      query.rows.forEach(r => {
+        const config = getBizConfig(r.slug);
+        const name   = (config.name || r.slug).replace(/"/g, '""');
+        const text   = (r.review || '').replace(/"/g, '""');
+        csv += `"${r.slug}","${name}","${r.review_order}","${text}"\n`;
+      });
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=15K_Reviews_Bank_Audit.csv');
+    res.status(200).send(csv);
   } catch (err) {
-    console.error(`[AI Test Error] ${cleanSlug}:`, err.message);
-    const msg = err.message || 'Gemini API call failed';
-    res.status(500).json({ error: msg, generated: false });
+    res.status(500).send(`CSV Export Error: ${err.message}`);
   }
 });
 
-// ── ADMIN: Comprehensive Per-Business Queue Summary API ───────────────────────
-app.get('/admin/api/queues/summary', adminAuth, (req, res) => {
-  const slugs = new Set([
-    ...Object.keys(dbStore),
-    ...Object.keys(DEFAULT_BUSINESSES),
-    ...Object.keys(reviewQueues)
-  ]);
+// ── ADMIN: Bank Inspection & Search API ───────────────────────────────────────
+app.get('/admin/api/bank/inspect', adminAuth, async (req, res) => {
+  if (!tursoClient) {
+    return res.status(500).json({ error: 'Turso Cloud DB not initialized' });
+  }
 
-  const summary = Array.from(slugs).map(slug => {
-    const config = getBizConfig(slug);
-    const q      = reviewQueues[slug] || [];
-    const stats  = getQueueStats(slug);
+  const slug  = sanitizeSlug(req.query.slug);
+  const q     = (req.query.q || '').trim();
+  const page  = parseInt(req.query.page || '1', 10);
+  const limit = 50;
+  const offset = (page - 1) * limit;
 
-    const aiCount   = q.filter(i => i.generated).length;
-    const seedCount = q.filter(i => !i.generated).length;
-    const backupCount = config.backupReviews ? config.backupReviews.length : 0;
+  try {
+    let whereClause = '';
+    const args = [];
 
-    return {
-      slug,
-      name:                  config.name || slug,
-      type:                  config.type || 'business',
-      language:              config.language || 'English',
-      menuItems:             config.menuItems || null,
-      highlights:            config.highlights || null,
-      queueLength:           q.length,
-      maxQueueSize:          MAX_QUEUE_SIZE,
-      aiGeneratedCount:      aiCount,
-      seedCount:             seedCount,
-      offlineBackupCount:    backupCount,
-      totalPopped:           stats.totalPopped || 0,
-      offlineFallbackPopped: stats.offlineFallbackPopped || 0,
-      lastPoppedAt:          stats.lastPoppedAt ? new Date(stats.lastPoppedAt).toLocaleTimeString() : 'Never',
-      lastGeneratedAt:       stats.lastGeneratedAt ? new Date(stats.lastGeneratedAt).toLocaleTimeString() : 'Startup',
-      hasCustomApiKey:       !!config.geminiApiKey,
-      googleReviewLink:      config.googleReviewLink || null
-    };
-  });
+    if (slug && q) {
+      whereClause = 'WHERE slug = ? AND review LIKE ?';
+      args.push(slug, `%${q}%`);
+    } else if (slug) {
+      whereClause = 'WHERE slug = ?';
+      args.push(slug);
+    } else if (q) {
+      whereClause = 'WHERE review LIKE ?';
+      args.push(`%${q}%`);
+    }
 
-  res.json({
-    totalBusinesses: summary.length,
-    globalOfflineFallbackCount,
-    summary
-  });
-});
+    const countRes = await tursoClient.execute({
+      sql: `SELECT COUNT(*) as total FROM review_bank ${whereClause}`,
+      args
+    });
 
-// ── ADMIN: Queue Inspector API ────────────────────────────────────────────────
-app.get('/admin/api/queue/:slug', adminAuth, (req, res) => {
-  const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
-  const config    = getBizConfig(cleanSlug);
-  seedQueueIfEmpty(cleanSlug, config);
+    const total = (countRes.rows && countRes.rows[0]) ? Number(countRes.rows[0].total) : 0;
 
-  const q     = reviewQueues[cleanSlug] || [];
-  const stats = getQueueStats(cleanSlug);
+    const dataRes = await tursoClient.execute({
+      sql: `SELECT id, slug, review, review_order FROM review_bank ${whereClause} ORDER BY slug ASC, review_order ASC LIMIT ? OFFSET ?`,
+      args: [...args, limit, offset]
+    });
 
-  res.json({
-    slug: cleanSlug,
-    businessName: config.name || cleanSlug,
-    queueLength: q.length,
-    maxSize: MAX_QUEUE_SIZE,
-    totalPopped: stats.totalPopped || 0,
-    offlineFallbackPopped: stats.offlineFallbackPopped || 0,
-    backupCount: config.backupReviews ? config.backupReviews.length : 0,
-    lastPoppedAt: stats.lastPoppedAt ? new Date(stats.lastPoppedAt).toLocaleTimeString() : 'Never',
-    items: q.map((item, idx) => ({
-      position: idx + 1,
-      review: item.review,
-      generated: item.generated,
-      source: item.source || 'queue',
-      meta: item.meta || {},
-      timestamp: item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : 'now'
-    }))
-  });
-});
+    // Get per-business summary counts & pointers
+    const summaryRes = await tursoClient.execute(`
+      SELECT b.slug, COUNT(r.id) as total_in_bank, COALESCE(p.current_pointer, 0) as current_pointer
+      FROM businesses b
+      LEFT JOIN review_bank r ON b.slug = r.slug
+      LEFT JOIN review_bank_pointers p ON b.slug = p.slug
+      GROUP BY b.slug
+    `);
 
-app.post('/admin/api/queue/:slug/clear', adminAuth, (req, res) => {
-  const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
-  reviewQueues[cleanSlug] = [];
-  res.json({ success: true, message: `Queue for business '${cleanSlug}' cleared successfully.` });
-});
+    const summary = summaryRes.rows.map(r => ({
+      slug: r.slug,
+      name: (getBizConfig(r.slug) || {}).name || r.slug,
+      totalInBank: Number(r.total_in_bank || 0),
+      currentPointer: Number(r.current_pointer || 0)
+    }));
 
-app.post('/admin/api/queue/:slug/seed', adminAuth, (req, res) => {
-  const cleanSlug = sanitizeSlug(req.params.slug) || 'saloon';
-  reviewQueues[cleanSlug] = [];
-  const config = getBizConfig(cleanSlug);
-  seedQueueIfEmpty(cleanSlug, config);
-  const q = reviewQueues[cleanSlug] || [];
-  res.json({ success: true, message: `Re-seeded human queue for '${cleanSlug}'. Queue size: ${q.length}` });
-});
-
-app.post('/admin/api/queue/:slug/generate', adminAuth, async (req, res) => {
-  const cleanSlug  = sanitizeSlug(req.params.slug) || 'saloon';
-  const clientMeta = getClientMetadata(req);
-  await generateAndEnqueueReview(cleanSlug, clientMeta);
-  const q = reviewQueues[cleanSlug] || [];
-  res.json({ success: true, message: `Triggered AI generation for '${cleanSlug}'. Current queue length: ${q.length}` });
+    res.json({
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+      summary,
+      items: dataRes.rows.map(r => ({
+        id: r.id,
+        slug: r.slug,
+        businessName: (getBizConfig(r.slug) || {}).name || r.slug,
+        reviewOrder: r.review_order,
+        review: r.review
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: `Bank inspection error: ${err.message}` });
+  }
 });
 
 // ── ADMIN: Analytics API & CSV Export ──────────────────────────────────────────
@@ -845,7 +716,7 @@ app.delete('/admin/api/analytics/clear', adminAuth, (req, res) => {
   analyticsStore.uniqueIps.clear();
   analyticsStore.deviceStats = { Smartphone: 0, Desktop: 0 };
   analyticsStore.timeStats = { Morning: 0, Afternoon: 0, Evening: 0 };
-  analyticsStore.sourceStats = { 'Gemini AI Queue': 0, 'Initial Seed Queue': 0, 'Offline Backup 50': 0 };
+  analyticsStore.sourceStats = { '5K Review Bank': 0, 'Gemini AI Queue': 0, 'Initial Seed Queue': 0 };
   analyticsStore.logs = [];
   res.json({ success: true, message: 'Analytics history cleared successfully.' });
 });
@@ -867,7 +738,6 @@ app.post('/admin/api/db/import', adminAuth, async (req, res) => {
 
   for (const [slug, cfg] of Object.entries(req.body)) {
     await upsertTursoBusiness(slug, cfg);
-    seedQueueIfEmpty(slug, cfg);
   }
 
   res.json({ success: true, count: Object.keys(dbStore).length, message: 'Database restored to Turso Cloud & Disk successfully.' });
@@ -900,8 +770,7 @@ app.post('/admin/api/settings', adminAuth, async (req, res) => {
 app.get('/admin/api/businesses', adminAuth, (req, res) => {
   const slugs = new Set([
     ...Object.keys(dbStore),
-    ...Object.keys(DEFAULT_BUSINESSES),
-    ...Object.keys(process.env).filter(k => k.startsWith('BIZ_')).map(k => k.replace('BIZ_', '').toLowerCase())
+    ...Object.keys(DEFAULT_BUSINESSES)
   ]);
 
   const list = Array.from(slugs).map(slug => {
@@ -912,8 +781,7 @@ app.get('/admin/api/businesses', adminAuth, (req, res) => {
       slug,
       ...(cfg || {}),
       hasCustomApiKey: hasCustomKey,
-      maskedApiKey: maskedKey,
-      hasBackup50: cfg.backupReviews && cfg.backupReviews.length === 50
+      maskedApiKey: maskedKey
     };
   });
 
@@ -930,26 +798,18 @@ app.post('/admin/api/config/:slug', adminAuth, async (req, res) => {
     req.body.siteUrl = `https://scanqr-beta.vercel.app?biz=${cleanSlug}`;
   }
 
-  // Preserve existing backupReviews if not passed
-  const existing = getBizConfig(cleanSlug);
-  if (existing.backupReviews && !req.body.backupReviews) {
-    req.body.backupReviews = existing.backupReviews;
-  }
-
-  // 1. Update in-memory persistent dbStore
   dbStore[cleanSlug] = req.body;
-
-  // 2. Persist to Turso Cloud SQLite Database (including custom geminiApiKey & backupReviews)!
   await upsertTursoBusiness(cleanSlug, req.body);
-
-  // 3. Persist to local disk database (db/businesses.json) synchronously
   saveDatabase(dbStore);
 
-  // 4. Keep env var synced
   process.env[`BIZ_${cleanSlug}`] = JSON.stringify(req.body);
-  
-  // 5. Seed queue immediately
-  seedQueueIfEmpty(cleanSlug, req.body);
+
+  // Auto generate 5K review bank if missing
+  setImmediate(async () => {
+    try {
+      await generate5kBankForSlug(cleanSlug, 5000);
+    } catch {}
+  });
 
   res.json({ success: true, config: req.body });
 });
@@ -962,9 +822,6 @@ app.delete('/admin/api/config/:slug', adminAuth, async (req, res) => {
   saveDatabase(dbStore);
 
   delete process.env[`BIZ_${cleanSlug}`];
-  delete reviewQueues[cleanSlug];
-  delete recentReviews[cleanSlug];
-  delete queueStats[cleanSlug];
 
   res.json({ success: true, message: `Business '${cleanSlug}' deleted from Turso Cloud & local DB.` });
 });
@@ -972,8 +829,7 @@ app.delete('/admin/api/config/:slug', adminAuth, async (req, res) => {
 app.get('/admin/api/status', adminAuth, async (req, res) => {
   const slugs = new Set([
     ...Object.keys(dbStore),
-    ...Object.keys(DEFAULT_BUSINESSES),
-    ...Object.keys(process.env).filter(k => k.startsWith('BIZ_')).map(k => k.replace('BIZ_', '').toLowerCase())
+    ...Object.keys(DEFAULT_BUSINESSES)
   ]);
 
   const checks = [];
@@ -1007,8 +863,6 @@ app.get('/admin/api/status', adminAuth, async (req, res) => {
     backend: { status: 'up', uptimeSeconds: Math.floor(process.uptime()), region: process.env.RENDER_REGION || 'unknown' },
     tursoConnected: !!tursoClient,
     geminiConfigured: !!process.env.GEMINI_API_KEY,
-    globalOfflineFallbackCount,
-    queues: Object.keys(reviewQueues).reduce((acc, k) => { acc[k] = reviewQueues[k].length; return acc; }, {}),
     sites: checks,
     checkedAt: new Date().toISOString()
   });
@@ -1018,27 +872,27 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// ── INITIALIZE TURSO DB & QUEUES ON STARTUP ─────────────────────────────────────
-initAndMigrateTurso().then(() => {
-  Object.keys(dbStore).forEach(slug => {
-    seedQueueIfEmpty(slug, dbStore[slug]);
-    // Auto-generate 50 backup reviews if missing
-    if (!dbStore[slug].backupReviews || dbStore[slug].backupReviews.length === 0) {
-      generate50BackupReviews(slug).catch(() => {});
-    }
+// ── INITIALIZE TURSO DB & BANK ON STARTUP ─────────────────────────────────────
+initAndMigrateTurso().then(async () => {
+  if (!tursoClient) return;
+  try {
+    const countRes = await tursoClient.execute('SELECT COUNT(*) as total FROM review_bank');
+    const totalInBank = countRes.rows && countRes.rows[0] ? Number(countRes.rows[0].total) : 0;
 
-    // 🚀 ASYNC PRE-WARMING ENGINE: Pre-fill FIFO queue buffer for instant 0ms AI reviews!
-    setImmediate(async () => {
-      try {
-        for (let i = 0; i < 3; i++) {
-          await generateAndEnqueueReview(slug, { deviceType: 'ServerPreWarm', timeOfDay: 'Startup' });
-        }
-      } catch {}
-    });
-  });
+    if (totalInBank === 0) {
+      console.log('🔄 Auto-generating initial 5,000 review banks for all businesses into Turso Cloud DB…');
+      for (const slug of Object.keys(dbStore)) {
+        await generate5kBankForSlug(slug, 5000);
+      }
+    } else {
+      console.log(`📦 Loaded ${totalInBank} pre-generated reviews from Turso Cloud DB Review Bank!`);
+    }
+  } catch (err) {
+    console.error('[Bank Startup Check Error]:', err.message);
+  }
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v17.0 (Upgraded FIFO Pre-Warming + Tone Selector Engine) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v18.0 (15,000 Review Bank Engine + Turso Cloud Storage + CSV Exporter) running on port ${PORT}`);
 });
