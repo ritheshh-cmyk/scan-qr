@@ -99,7 +99,7 @@
     }
   </style>
 </head>
-<body onclick="handleTap()" ontouchstart="handleTap()">
+<body>
   <main>
     <div class="icon" id="bizIcon">🛍️</div>
     <h1 id="heading">Opening Google Reviews…</h1>
@@ -230,13 +230,39 @@
       });
     }
 
-    // Initialize UI on load
-    document.getElementById('heading').textContent = "Tap to Write Review";
+    // ── CACHED LOCAL FALLBACKS (Resolves network failure / offline edge cases) ──
+    const localCachedLink = localStorage.getItem(`biz_link_${BUSINESS_SLUG}`);
+    const localCachedName = localStorage.getItem(`biz_name_${BUSINESS_SLUG}`);
+    const localCachedType = localStorage.getItem(`biz_type_${BUSINESS_SLUG}`);
+    const localCachedReview = localStorage.getItem(`biz_review_${BUSINESS_SLUG}`);
+
+    if (localCachedLink && localCachedLink.trim()) {
+      googleReviewLink = localCachedLink.trim();
+    }
+    if (localCachedName && localCachedName.trim()) {
+      document.getElementById('heading').textContent = `Review ${localCachedName}`;
+      document.getElementById('pageTitle').textContent = `Review ${localCachedName}`;
+    }
+    if (localCachedType) {
+      document.getElementById('bizIcon').textContent = getCategoryIcon(localCachedType);
+    }
+    if (localCachedReview && localCachedReview.trim()) {
+      activeReview = localCachedReview.trim();
+    }
+
+    // Initialize default UI text
+    if (!localCachedName) {
+      document.getElementById('heading').textContent = "Tap to Write Review";
+    }
     document.getElementById('subtext').textContent = "Tap anywhere to copy your 5-star review and redirect.";
     const mainBtn = document.getElementById('mainBtn');
     mainBtn.textContent = "Copy Review & Continue 🚀";
     mainBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
     mainBtn.style.boxShadow = "0 10px 24px rgba(16, 185, 129, 0.4)";
+
+    // Bind click event listener directly to window to bypass iOS Safari non-interactive element bubbling restriction
+    // and resolve accidental redirects during scroll/swipes (touchstart event)
+    window.addEventListener('click', handleTap);
 
     // ── DYNAMICALLY LOAD BUSINESS CONFIG & REVIEW IN PARALLEL ──────────────────
     Promise.all([
@@ -246,20 +272,25 @@
       if (cfg) {
         if (cfg.googleReviewLink && cfg.googleReviewLink.trim()) {
           googleReviewLink = cfg.googleReviewLink.trim();
+          localStorage.setItem(`biz_link_${BUSINESS_SLUG}`, googleReviewLink);
         }
-        if (cfg.name) {
-          document.getElementById('heading').textContent = `Review ${cfg.name}`;
-          document.getElementById('pageTitle').textContent = `Review ${cfg.name}`;
+        if (cfg.name && cfg.name.trim()) {
+          const cleanName = cfg.name.trim();
+          document.getElementById('heading').textContent = `Review ${cleanName}`;
+          document.getElementById('pageTitle').textContent = `Review ${cleanName}`;
+          localStorage.setItem(`biz_name_${BUSINESS_SLUG}`, cleanName);
         }
         if (cfg.type) {
           document.getElementById('bizIcon').textContent = getCategoryIcon(cfg.type);
+          localStorage.setItem(`biz_type_${BUSINESS_SLUG}`, cfg.type);
         }
       }
-      if (revData && revData.review) {
-        activeReview = revData.review;
+      if (revData && revData.review && revData.review.trim()) {
+        activeReview = revData.review.trim();
+        localStorage.setItem(`biz_review_${BUSINESS_SLUG}`, activeReview);
       }
-    }).catch(() => {
-      // do nothing, fall back to default
+    }).catch((e) => {
+      console.warn("API fetch error, relying on cache/generator fallbacks:", e);
     });
   </script>
 </body>
