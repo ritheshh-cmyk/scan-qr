@@ -420,20 +420,48 @@ async function generate5kBankForSlug(slug, targetCount = 5000) {
       const phrase    = CASUAL_PHRASES[(order + i) % CASUAL_PHRASES.length];
 
       let rev = '';
-      const stylePattern = order % 6;
+      const stylePattern = order % 20;
 
       if (stylePattern === 0) {
-        rev = `${phrase} so glad I visited ${name}. tried the ${item} and it was incredible. ${highlight}, definitely coming back!`;
+        rev = `honestly so happy with my visit to ${name}! tried the ${item} and it was amazing. ${highlight}, definitely coming back.`;
       } else if (stylePattern === 1) {
-        rev = `Loved my visit to ${name}! The team was super welcoming, ${highlight}. Really happy with my ${item}.`;
+        rev = `just left ${name} and had to write a review. ${phrase} the ${item} was so good and ${highlight}.`;
       } else if (stylePattern === 2) {
-        rev = `Best ${type} experience! Spotless clean environment at ${name}, excellent ${item}, and fair pricing. Highly recommended!`;
+        rev = `stopped by ${name} today. awesome experience, really liked the ${item} and ${highlight}. top tier service.`;
       } else if (stylePattern === 3) {
-        rev = `Walked into ${name} today and left super satisfied. ${phrase} top quality ${item} and ${highlight}.`;
+        rev = `best ${type} experience in town hands down. ${name} has the best ${item} and ${highlight}.`;
       } else if (stylePattern === 4) {
-        rev = `Top tier experience at ${name}! Wonderful ${item}, peaceful atmosphere, and ${highlight}. 100% worth every penny!`;
+        rev = `walked in to ${name} today and got served right away. ${phrase} top tier ${item} and ${highlight}.`;
+      } else if (stylePattern === 5) {
+        rev = `so glad my friend recommended ${name}! the ${item} was incredible and ${highlight}. will be back for sure.`;
+      } else if (stylePattern === 6) {
+        rev = `visited ${name} today. super clean vibe, awesome ${item}, and ${highlight}. highly recommend!`;
+      } else if (stylePattern === 7) {
+        rev = `if you're looking for a great ${type}, check out ${name}. ${phrase} their ${item} is unmatched and ${highlight}.`;
+      } else if (stylePattern === 8) {
+        rev = `first time visiting ${name} and I'm super impressed. ${item} was top notch and ${highlight}.`;
+      } else if (stylePattern === 9) {
+        rev = `can't say enough good things about ${name}! tried their ${item} today and ${highlight}. 100% worth it.`;
+      } else if (stylePattern === 10) {
+        rev = `had an amazing experience at ${name}. ${phrase} the team was warm and welcoming, ${item} was perfect, and ${highlight}.`;
+      } else if (stylePattern === 11) {
+        rev = `really great vibe at ${name}. fast service, awesome ${item}, and ${highlight}.`;
+      } else if (stylePattern === 12) {
+        rev = `loved my time at ${name}! ${phrase} really happy with the ${item} and how ${highlight}.`;
+      } else if (stylePattern === 13) {
+        rev = `stopped in for a quick visit at ${name}. got the ${item} and it was super fresh. ${highlight}.`;
+      } else if (stylePattern === 14) {
+        rev = `always a pleasure visiting ${name}. consistently great ${item} and ${highlight}. my go-to spot.`;
+      } else if (stylePattern === 15) {
+        rev = `fair prices, awesome staff, and top quality ${item} at ${name}. ${highlight}.`;
+      } else if (stylePattern === 16) {
+        rev = `visited ${name} this afternoon. ${phrase} left feeling super satisfied with my ${item}. ${highlight}.`;
+      } else if (stylePattern === 17) {
+        rev = `outstanding service at ${name}! staff were super friendly, ${item} was top tier, and ${highlight}.`;
+      } else if (stylePattern === 18) {
+        rev = `recommend ${name} to everyone looking for great ${type}. excellent ${item} and ${highlight}.`;
       } else {
-        rev = `${name} exceeded my expectations today. ${phrase} impressive ${item}, awesome staff, and ${highlight}.`;
+        rev = `really happy with my visit to ${name} today. ${phrase} fantastic ${item} and ${highlight}.`;
       }
 
       statements.push({
