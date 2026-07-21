@@ -318,15 +318,21 @@ function recordScanEvent(slug, meta, reviewSource) {
 // ── Multi-Angle Human Personas for Extreme Randomness ──────────────────────────
 const PERSONAS = [
   "Casual & Short: 2 snappy sentences, very natural, started lowercase, mobile user vibe.",
-  "Enthusiastic & Detailed: Happy customer praising the friendly staff, clean aesthetic, and great products/service.",
+  "Enthusiastic & Detailed: Happy customer praising friendly staff, clean aesthetic, and great products/service.",
   "Walk-in Direct: Focus on unexpected quick availability, fair pricing, awesome quality, great result.",
-  "Cozy Vibe: Focus on peaceful atmosphere, great smell, attentive staff, leaving super satisfied.",
-  "Minimalist 5-Star: 20 to 30 words, punchy, honest, top tier recommendation."
+  "Cozy Vibe: Focus on peaceful atmosphere, clean setup, attentive staff, leaving super satisfied.",
+  "Minimalist 5-Star: 20 to 30 words, punchy, honest, direct recommendation.",
+  "Local Regular Customer: Vibe of a loyal customer who frequents this place regularly and recommends it to friends.",
+  "First Time Visitor: Vibe of someone who tried this place for the first time on a recommendation and was blown away.",
+  "Family or Group Visitor: Vibe of a family or group of friends enjoying their visit together.",
+  "Speed & Efficiency Focus: Praising quick response, prompt service, zero waiting time, smooth experience.",
+  "Quality Specialist: Highlighting craftsmanship, fresh ingredients, top-notch quality, and attention to detail."
 ];
 
 const CASUAL_PHRASES = [
   "honestly", "super happy", "really impressed", "hands down", "definitely coming back",
-  "so glad I found this place", "left feeling great", "fresh and clean", "spot on", "worth every penny"
+  "so glad I found this place", "left feeling great", "fresh and clean", "spot on", "worth every penny",
+  "exceeded my expectations", "top quality experience", "cannot recommend enough", "my new favorite spot", "absolutely loved it"
 ];
 
 function sanitizeSlug(s) {
