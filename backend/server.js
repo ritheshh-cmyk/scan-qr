@@ -548,27 +548,50 @@ app.get('/api/config/:slug', (req, res) => {
   res.json(config);
 });
 
-// ── ULTRA FAST 0ms USER REVIEW ENDPOINT (< 5ms FROM 5K TURSO BANK) ────────────
+// ── IN-MEMORY FIFO QUEUE WITH INSTANT TURSO DB PRE-FETCH ENGINE ──────────────
+const fifoQueues = {};
+
+async function ensureFifoQueuePrefilled(slug) {
+  const cleanSlug = sanitizeSlug(slug);
+  if (!fifoQueues[cleanSlug]) fifoQueues[cleanSlug] = [];
+
+  const targetSize = 10;
+  while (fifoQueues[cleanSlug].length < targetSize) {
+    const bankResult = await popFrom5kReviewBank(cleanSlug);
+    if (!bankResult || !bankResult.review) break;
+    fifoQueues[cleanSlug].push(bankResult);
+  }
+}
+
 async function handleReviewRequest(req, res) {
   const cleanSlug  = sanitizeSlug(req.params.slug) || 'saloon';
   const config     = getBizConfig(cleanSlug);
   const clientMeta = getClientMetadata(req);
 
+  if (!fifoQueues[cleanSlug]) fifoQueues[cleanSlug] = [];
+
+  // If buffer is empty, prefetch synchronously once
+  if (fifoQueues[cleanSlug].length === 0) {
+    await ensureFifoQueuePrefilled(cleanSlug);
+  }
+
   let reviewText   = '';
-  let reviewSource = '5K Review Bank (Turso Cloud)';
+  let reviewSource = '5K Review Bank (Turso Cloud RAM FIFO)';
 
-  // 1. Try popping from 5K Turso Review Bank first (< 5ms)
-  const bankResult = await popFrom5kReviewBank(cleanSlug);
-
-  if (bankResult && bankResult.review) {
-    reviewText   = bankResult.review;
-    reviewSource = `5K Review Bank (Turso Cloud #${bankResult.order}/${bankResult.totalInBank})`;
+  if (fifoQueues[cleanSlug].length > 0) {
+    const popped = fifoQueues[cleanSlug].shift();
+    reviewText   = popped.review;
+    reviewSource = `5K Review Bank (Turso Cloud #${popped.order}/${popped.totalInBank})`;
   } else {
-    // Fallback seed review if bank is generating
     const name = config.name || cleanSlug;
     reviewText = `honestly so happy with my visit to ${name}! staff were super friendly, clean place, and service was top quality. definitely coming back.`;
     reviewSource = 'Seed Review Fallback';
   }
+
+  // 🚀 INSTANT RE-FILL: As soon as 1 review is used, instantly pre-fetch next from DB in background!
+  setImmediate(() => {
+    ensureFifoQueuePrefilled(cleanSlug).catch(() => {});
+  });
 
   recordScanEvent(cleanSlug, clientMeta, reviewSource);
 
@@ -578,6 +601,7 @@ async function handleReviewRequest(req, res) {
     review: reviewText,
     generated: true,
     reviewSource,
+    bufferRemaining: fifoQueues[cleanSlug].length,
     clientMeta: { deviceType: clientMeta.deviceType, timeOfDay: clientMeta.timeOfDay }
   });
 }
@@ -915,6 +939,11 @@ initAndMigrateTurso().then(async () => {
     } else {
       console.log(`📦 Loaded ${totalInBank} pre-generated reviews from Turso Cloud DB Review Bank!`);
     }
+
+    // 🚀 PRE-FILL RAM FIFO QUEUES FOR ALL BUSINESSES AT STARTUP (< 1ms USER LATENCY)
+    for (const slug of Object.keys(dbStore)) {
+      ensureFifoQueuePrefilled(slug).catch(() => {});
+    }
   } catch (err) {
     console.error('[Bank Startup Check Error]:', err.message);
   }
@@ -922,5 +951,5 @@ initAndMigrateTurso().then(async () => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v18.0 (15,000 Review Bank Engine + Turso Cloud Storage + CSV Exporter) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v18.2 (RAM FIFO Queue + Instant Turso DB Prefetch Engine) running on port ${PORT}`);
 });
