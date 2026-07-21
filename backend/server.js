@@ -119,6 +119,25 @@ async function initAndMigrateTurso() {
       );
     `);
 
+    // ── Run migrations for columns added in newer versions ───────────────────────
+    const columnsToMigrate = [
+      { name: 'menuItems', type: 'TEXT' },
+      { name: 'highlights', type: 'TEXT' },
+      { name: 'reviewTone', type: 'TEXT' }
+    ];
+
+    for (const col of columnsToMigrate) {
+      try {
+        await tursoClient.execute(`ALTER TABLE businesses ADD COLUMN ${col.name} ${col.type}`);
+        console.log(`📡 Migrated database: Added column '${col.name}' to businesses table.`);
+      } catch (err) {
+        // Ignore column already exists errors
+        if (!err.message.includes('duplicate column name') && !err.message.includes('already exists')) {
+          console.warn(`[Turso Migration Column Warning] ${col.name}:`, err.message);
+        }
+      }
+    }
+
     // 2. Global App Settings / API Keys table
     await tursoClient.execute(`
       CREATE TABLE IF NOT EXISTS app_settings (
