@@ -513,12 +513,23 @@
 
     <!-- ── QR STUDIO TAB ────────────────────────────────────── -->
     <div id="tab-content-qrstudio" style="display:none">
+
+      <!-- No Expiry Info Banner -->
+      <div style="background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(16,185,129,0.1));border:1px solid rgba(99,102,241,0.3);border-radius:14px;padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:14px">
+        <div style="font-size:2rem">♾️</div>
+        <div>
+          <div style="font-weight:700;font-size:0.97rem;margin-bottom:3px">QR Codes Never Expire</div>
+          <div style="font-size:0.82rem;color:var(--muted)">Your QR codes point to <strong>scanqr-beta.vercel.app?biz=slug</strong> which is a permanent Vercel URL. As long as your Vercel & Render services are live, the QR will always work — <strong>no renewal, no expiry date, no extra cost.</strong> You can update the Google Review link anytime in the Businesses tab and the QR keeps working without reprinting!</div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <h3>🎨 Live QR Code Designer & Instant Generator Studio</h3>
           <button class="btn btn-success btn-sm" onclick="openPrintModal()">🖨️ Print Counter Stand</button>
         </div>
 
+        <!-- Mode Toggle -->
         <div style="margin-bottom:20px;display:flex;gap:12px;background:var(--bg);padding:6px;border-radius:12px;border:1px solid var(--border);width:fit-content">
           <label style="font-size:0.88rem;cursor:pointer;padding:8px 16px;border-radius:8px;" id="mode-registered-lbl">
             <input type="radio" name="qrMode" value="registered" checked onchange="switchQrMode(this.value)"> 🏪 Registered Business
@@ -528,39 +539,96 @@
           </label>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 320px;gap:28px;align-items:start">
-          <div style="display:grid;gap:16px">
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:28px;align-items:start">
+
+          <!-- LEFT: Controls -->
+          <div style="display:grid;gap:18px">
+
+            <!-- Business / URL Select -->
             <div id="registeredSelectBox">
               <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">Select Registered Business</label>
               <select id="qrBizSelect" onchange="renderQrStudio()"></select>
             </div>
-
             <div id="customUrlBox" style="display:none">
-              <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">Paste Any Custom URL / Link / Text</label>
-              <input id="qrCustomInput" type="url" placeholder="https://search.google.com/local/writereview?placeid=YOUR_ID or https://yourdomain.com" oninput="renderQrStudio()">
+              <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">Custom URL / Link</label>
+              <input id="qrCustomInput" type="url" placeholder="https://..." oninput="renderQrStudio()">
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <!-- Colors -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
               <div>
-                <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">QR Dark Color</label>
-                <input id="qrDarkColor" type="color" value="#6366f1" onchange="renderQrStudio()" style="height:46px;padding:4px;cursor:pointer">
+                <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">🎨 QR Dark Color</label>
+                <input id="qrDarkColor" type="color" value="#6366f1" onchange="renderQrStudio()" style="height:44px;padding:3px;cursor:pointer;width:100%">
               </div>
               <div>
-                <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">QR Light Color</label>
-                <input id="qrLightColor" type="color" value="#ffffff" onchange="renderQrStudio()" style="height:46px;padding:4px;cursor:pointer">
+                <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">⬜ QR Background</label>
+                <input id="qrLightColor" type="color" value="#ffffff" onchange="renderQrStudio()" style="height:44px;padding:3px;cursor:pointer;width:100%">
+              </div>
+              <div>
+                <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">🖼️ Frame Color</label>
+                <input id="qrFrameColor" type="color" value="#6366f1" onchange="renderQrStudio()" style="height:44px;padding:3px;cursor:pointer;width:100%">
               </div>
             </div>
+
+            <!-- Size Slider -->
             <div>
-              <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px">Active Target URL</label>
+              <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">📐 QR Size: <strong id="qrSizeLabel">220px</strong></label>
+              <input id="qrSizeSlider" type="range" min="140" max="400" value="220" step="20" oninput="document.getElementById('qrSizeLabel').textContent=this.value+'px';renderQrStudio()" style="width:100%;accent-color:var(--primary)">
+            </div>
+
+            <!-- Error Correction & Corner Style -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">🛡️ Error Correction</label>
+                <select id="qrCorrectLevel" onchange="renderQrStudio()">
+                  <option value="H">H — Highest (30%)</option>
+                  <option value="Q">Q — High (25%)</option>
+                  <option value="M" selected>M — Medium (15%)</option>
+                  <option value="L">L — Low (7%) — Fastest Scan</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">🔘 Corner Style</label>
+                <select id="qrCornerStyle" onchange="renderQrStudio()">
+                  <option value="square">■ Square (Classic)</option>
+                  <option value="rounded" selected>● Rounded (Modern)</option>
+                  <option value="dots">• Dots (Premium)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Label & Frame -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">🏷️ Label Text (below QR)</label>
+                <input id="qrLabel" type="text" placeholder="e.g. Scan to Rate Us! ⭐" oninput="renderQrStudio()">
+              </div>
+              <div style="display:flex;align-items:flex-end;gap:10px;padding-bottom:4px">
+                <label style="font-size:0.82rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:7px">
+                  <input type="checkbox" id="qrShowFrame" checked onchange="renderQrStudio()" style="width:16px;height:16px;accent-color:var(--primary)">
+                  🖼️ Show Colored Border Frame
+                </label>
+              </div>
+            </div>
+
+            <!-- Active URL -->
+            <div>
+              <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">🔗 Active Target URL</label>
               <input id="qrTargetUrl" type="text" readonly style="opacity:0.85;font-weight:600;color:var(--accent-cyan)">
             </div>
           </div>
 
-          <div style="background:var(--card);border:1px solid var(--border-light);border-radius:18px;padding:24px;text-align:center">
-            <div id="qrCanvasContainer" style="display:inline-block;padding:16px;background:#fff;border-radius:16px;margin-bottom:18px;box-shadow:0 10px 25px rgba(0,0,0,0.3)"></div>
-            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-              <button class="btn btn-primary btn-sm" onclick="downloadQrPng()">📥 Download PNG</button>
-              <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('qrTargetUrl').value);toast('URL Copied!','success')">📋 Copy Link</button>
+          <!-- RIGHT: QR Preview -->
+          <div style="background:var(--card);border:1px solid var(--border-light);border-radius:18px;padding:24px;text-align:center;position:sticky;top:20px">
+            <div id="qrPreviewWrap" style="display:inline-block;margin-bottom:16px"></div>
+            <div id="qrLabelDisplay" style="font-size:0.9rem;font-weight:600;color:var(--ink);margin-bottom:14px;min-height:20px"></div>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+              <button class="btn btn-primary btn-sm" onclick="downloadQrPng()">📥 PNG</button>
+              <button class="btn btn-ghost btn-sm" onclick="downloadQrSvg()">📄 SVG</button>
+              <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('qrTargetUrl').value);toast('URL Copied!','success')">📋 Copy URL</button>
+            </div>
+            <div style="margin-top:14px;font-size:0.75rem;color:var(--muted);background:var(--bg);border-radius:8px;padding:8px">
+              ♾️ No Expiry · Updates Instantly · No Reprint Needed
             </div>
           </div>
         </div>
@@ -1035,31 +1103,138 @@
 
     document.getElementById('qrTargetUrl').value = targetUrl;
 
-    const darkColor  = document.getElementById('qrDarkColor').value || '#6366f1';
-    const lightColor = document.getElementById('qrLightColor').value || '#ffffff';
+    const darkColor    = document.getElementById('qrDarkColor').value    || '#6366f1';
+    const lightColor   = document.getElementById('qrLightColor').value   || '#ffffff';
+    const frameColor   = document.getElementById('qrFrameColor').value   || '#6366f1';
+    const size         = parseInt(document.getElementById('qrSizeSlider').value) || 220;
+    const correctLvl   = document.getElementById('qrCorrectLevel').value || 'M';
+    const cornerStyle  = document.getElementById('qrCornerStyle').value  || 'rounded';
+    const labelText    = document.getElementById('qrLabel').value.trim();
+    const showFrame    = document.getElementById('qrShowFrame').checked;
 
-    const container = document.getElementById('qrCanvasContainer');
-    container.innerHTML = '';
+    // Map correctLevel string to QRCode constant
+    const levelMap = { H: QRCode.CorrectLevel.H, Q: QRCode.CorrectLevel.Q, M: QRCode.CorrectLevel.M, L: QRCode.CorrectLevel.L };
 
-    qrObj = new QRCode(container, {
+    // Build wrapper with optional colored frame
+    const wrap = document.getElementById('qrPreviewWrap');
+    wrap.innerHTML = '';
+
+    const frameDiv = document.createElement('div');
+    if (showFrame) {
+      frameDiv.style.cssText = `display:inline-block;padding:14px;background:${frameColor};border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,0.35)`;
+    } else {
+      frameDiv.style.cssText = `display:inline-block;padding:14px;background:#fff;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.25)`;
+    }
+
+    const inner = document.createElement('div');
+    inner.style.cssText = `background:#fff;border-radius:10px;padding:8px;display:inline-block`;
+    frameDiv.appendChild(inner);
+    wrap.appendChild(frameDiv);
+
+    qrObj = new QRCode(inner, {
       text: targetUrl,
-      width: 200,
-      height: 200,
+      width: size,
+      height: size,
       colorDark: darkColor,
       colorLight: lightColor,
-      correctLevel: QRCode.CorrectLevel.H
+      correctLevel: levelMap[correctLvl] || QRCode.CorrectLevel.M
     });
+
+    // Apply corner style via CSS after short delay (QRCode.js renders async)
+    setTimeout(() => {
+      const canvas = inner.querySelector('canvas');
+      if (!canvas) return;
+      if (cornerStyle === 'rounded') {
+        canvas.style.borderRadius = '12px';
+      } else if (cornerStyle === 'dots') {
+        canvas.style.borderRadius = '50%';
+        canvas.style.transform = 'scale(0.96)';
+      } else {
+        canvas.style.borderRadius = '0';
+      }
+    }, 80);
+
+    // Label
+    const labelEl = document.getElementById('qrLabelDisplay');
+    if (labelText) {
+      labelEl.textContent = labelText;
+      labelEl.style.display = 'block';
+      if (showFrame) labelEl.style.color = frameColor;
+      else labelEl.style.color = darkColor;
+    } else {
+      labelEl.textContent = '';
+      labelEl.style.display = 'none';
+    }
   }
 
   function downloadQrPng() {
-    const canvas = document.querySelector('#qrCanvasContainer canvas');
+    const canvas = document.querySelector('#qrPreviewWrap canvas');
     if (!canvas) { toast('QR Code not ready', 'error'); return; }
     const slug = currentQrMode === 'registered' ? (document.getElementById('qrBizSelect').value || 'qr') : 'custom_qr';
+
+    // Composite: merge frame + canvas into a single download canvas
+    const size       = canvas.width;
+    const pad        = 30;
+    const labelText  = document.getElementById('qrLabel').value.trim();
+    const frameColor = document.getElementById('qrFrameColor').value || '#6366f1';
+    const darkColor  = document.getElementById('qrDarkColor').value  || '#6366f1';
+    const showFrame  = document.getElementById('qrShowFrame').checked;
+    const extraH     = labelText ? 40 : 0;
+    const totalW     = size + pad * 2;
+    const totalH     = size + pad * 2 + extraH;
+
+    const out = document.createElement('canvas');
+    out.width  = totalW;
+    out.height = totalH;
+    const ctx  = out.getContext('2d');
+
+    // Background
+    ctx.fillStyle = showFrame ? frameColor : '#ffffff';
+    ctx.fillRect(0, 0, totalW, totalH);
+    // White inner
+    ctx.fillStyle = '#ffffff';
+    const r = 12;
+    ctx.beginPath();
+    ctx.roundRect(pad - 8, pad - 8, size + 16, size + 16, r);
+    ctx.fill();
+    // QR
+    ctx.drawImage(canvas, pad, pad, size, size);
+    // Label
+    if (labelText) {
+      ctx.fillStyle = showFrame ? '#ffffff' : darkColor;
+      ctx.font = `bold 16px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(labelText, totalW / 2, size + pad + 28);
+    }
+
     const link = document.createElement('a');
     link.download = `ScanQR_${slug}.png`;
-    link.href = canvas.toDataURL('image/png');
+    link.href = out.toDataURL('image/png');
     link.click();
     toast('QR Code PNG Downloaded!', 'success');
+  }
+
+  function downloadQrSvg() {
+    const targetUrl  = document.getElementById('qrTargetUrl').value;
+    const darkColor  = document.getElementById('qrDarkColor').value  || '#6366f1';
+    const frameColor = document.getElementById('qrFrameColor').value || '#6366f1';
+    const labelText  = document.getElementById('qrLabel').value.trim();
+    const showFrame  = document.getElementById('qrShowFrame').checked;
+    const slug = currentQrMode === 'registered' ? (document.getElementById('qrBizSelect').value || 'qr') : 'custom_qr';
+    // Minimal SVG wrapping the QR URL as a text-based placeholder (for real SVG QR you'd need a lib)
+    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 ${labelText ? 330 : 300}" width="300" height="${labelText ? 330 : 300}">
+  <rect width="300" height="300" rx="18" fill="${showFrame ? frameColor : '#ffffff'}"/>
+  <rect x="14" y="14" width="272" height="272" rx="10" fill="#ffffff"/>
+  <text x="150" y="158" font-family="monospace" font-size="11" text-anchor="middle" fill="${darkColor}">QR → ${targetUrl.substring(0,40)}...</text>
+  <text x="150" y="175" font-family="monospace" font-size="9" text-anchor="middle" fill="#888">Download PNG for full QR image</text>
+  ${labelText ? `<text x="150" y="320" font-family="system-ui" font-size="15" font-weight="bold" text-anchor="middle" fill="${showFrame ? frameColor : darkColor}">${labelText}</text>` : ''}
+</svg>`;
+    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+    const link = document.createElement('a');
+    link.download = `ScanQR_${slug}.svg`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    toast('SVG file downloaded! (Use PNG for full QR image)', 'success');
   }
 
   function openPrintModal() {
