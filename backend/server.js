@@ -538,7 +538,39 @@ async function popFrom5kReviewBank(slug) {
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', uptime: Math.floor(process.uptime()), ts: new Date().toISOString(), tursoConnected: !!tursoClient });
+  const mem = process.memoryUsage();
+  const uptimeSec = Math.floor(process.uptime());
+  const hours = Math.floor(uptimeSec / 3600);
+  const mins  = Math.floor((uptimeSec % 3600) / 60);
+  const secs  = uptimeSec % 60;
+
+  // FIFO queue depths per slug
+  const queueDepths = {};
+  for (const [slug, q] of Object.entries(fifoQueues || {})) {
+    queueDepths[slug] = q.length;
+  }
+
+  // Business bank sizes from in-memory configs
+  const bizSlugs = Object.keys(bizConfigs || {});
+
+  res.json({
+    status: 'ok',
+    tursoConnected: !!tursoClient,
+    uptime: uptimeSec,
+    uptimeFormatted: `${hours}h ${mins}m ${secs}s`,
+    ts: new Date().toISOString(),
+    memory: {
+      rssMB:       +(mem.rss / 1024 / 1024).toFixed(1),
+      heapUsedMB:  +(mem.heapUsed / 1024 / 1024).toFixed(1),
+      heapTotalMB: +(mem.heapTotal / 1024 / 1024).toFixed(1),
+      externalMB:  +(mem.external / 1024 / 1024).toFixed(1),
+    },
+    fifoQueueDepths: queueDepths,
+    registeredBusinesses: bizSlugs.length,
+    nodeVersion: process.version,
+    env: process.env.NODE_ENV || 'production',
+    platform: process.platform,
+  });
 });
 
 // ── GET config for a slug ──────────────────────────────────────────────────────

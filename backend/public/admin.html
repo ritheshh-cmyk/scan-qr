@@ -563,20 +563,58 @@
       ⏱️ Auto-Refresh (10s)
     </label>
     <div class="spacer"></div>
+    <div class="tabs-nav">
+    <div class="tab-item active" onclick="switchTab('status',this)" id="tab-status">📊 System Status</div>
+    <div class="tab-item" onclick="switchTab('health',this)" id="tab-health">🩺 Health Monitor</div>
+    <div class="tab-item" onclick="switchTab('bank',this)" id="tab-bank">📦 5K Review Bank &amp; CSV Audit</div>
+    <div class="tab-item" onclick="switchTab('qrstudio',this)" id="tab-qrstudio">🎨 QR Studio &amp; Instant Generator</div>
+    <div class="tab-item" onclick="switchTab('analytics',this)" id="tab-analytics">📈 Real-Time Analytics</div>
+    <div class="tab-item" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
+    <div class="tab-item" onclick="switchTab('settings',this)" id="tab-settings">⚙️ Settings &amp; Turso Cloud DB</div>
+  </div>
     <span id="backendBadge" class="backend-badge"><span class="pulse-dot"></span> ☁️ Turso Cloud SQLite Active</span>
     <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
   </div>
 
-  <div class="tabs-nav">
-    <div class="tab-item active" onclick="switchTab('status',this)" id="tab-status">📊 System Status</div>
-    <div class="tab-item" onclick="switchTab('bank',this)" id="tab-bank">📦 5K Review Bank & CSV Audit</div>
-    <div class="tab-item" onclick="switchTab('qrstudio',this)" id="tab-qrstudio">🎨 QR Studio & Instant Generator</div>
-    <div class="tab-item" onclick="switchTab('analytics',this)" id="tab-analytics">📈 Real-Time Analytics</div>
-    <div class="tab-item" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
-    <div class="tab-item" onclick="switchTab('settings',this)" id="tab-settings">⚙️ Settings & Turso Cloud DB</div>
-  </div>
-
   <div class="content-area">
+
+    <!-- ── HEALTH MONITOR TAB ─────────────────────────────── -->
+    <div id="tab-content-health" style="display:none">
+
+      <!-- Top row: headline metrics -->
+      <div class="stats-grid" id="healthStatsRow" style="margin-bottom:24px"></div>
+
+      <!-- Memory gauges -->
+      <div class="card" style="margin-bottom:22px">
+        <div class="card-header">
+          <h3>🧠 Memory Usage</h3>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span id="healthLastPing" style="font-size:0.8rem;color:var(--muted)">–</span>
+            <button class="btn btn-ghost btn-sm" onclick="loadHealth()">↻ Refresh</button>
+          </div>
+        </div>
+        <div id="healthMemBars" style="display:grid;gap:14px"></div>
+      </div>
+
+      <!-- FIFO Queue Depths -->
+      <div class="card" style="margin-bottom:22px">
+        <div class="card-header">
+          <h3>⚡ RAM FIFO Queue Depths</h3>
+          <span style="font-size:0.8rem;color:var(--muted)">Target: 10 reviews buffered per business</span>
+        </div>
+        <div id="healthFifoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px"></div>
+      </div>
+
+      <!-- System info table -->
+      <div class="card">
+        <div class="card-header"><h3>🖥️ System Info</h3></div>
+        <table class="status-table" id="healthSysTable">
+          <thead><tr><th>Property</th><th>Value</th></tr></thead>
+          <tbody id="healthSysBody"></tbody>
+        </table>
+      </div>
+
+    </div>
 
     <!-- ── STATUS TAB ───────────────────────────────────────── -->
     <div id="tab-content-status">
@@ -1097,18 +1135,136 @@
     return r.json();
   }
 
+  let healthAutoRefreshTimer = null;
+
   function switchTab(name, el) {
     document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
-    ['status','bank','qrstudio','analytics','businesses','settings'].forEach(t => {
+    ['status','health','bank','qrstudio','analytics','businesses','settings'].forEach(t => {
       document.getElementById(`tab-content-${t}`).style.display = t === name ? '' : 'none';
     });
+    // Stop health auto-refresh when leaving health tab
+    if (healthAutoRefreshTimer && name !== 'health') {
+      clearInterval(healthAutoRefreshTimer);
+      healthAutoRefreshTimer = null;
+    }
     if (name === 'status')      loadStatus();
+    if (name === 'health')      { loadHealth(); healthAutoRefreshTimer = setInterval(loadHealth, 15000); }
     if (name === 'bank')        loadBankInspector(1);
     if (name === 'qrstudio')    loadQrStudio();
     if (name === 'analytics')   loadAnalytics();
     if (name === 'businesses')  loadBusinesses();
     if (name === 'settings')    loadSettings();
+  }
+
+  async function loadHealth() {
+    const t0 = performance.now();
+    let h;
+    try {
+      h = await apiJSON('/health');
+    } catch(e) {
+      document.getElementById('healthStatsRow').innerHTML =
+        `<div class="stat-card"><div class="stat-label">Backend</div><div class="stat-value" style="color:var(--danger)">Offline</div></div>`;
+      return;
+    }
+    const ping = Math.round(performance.now() - t0);
+
+    // ── Headline stat cards ──────────────────────────────────
+    const statusColor  = h.status === 'ok' ? 'var(--success)' : 'var(--danger)';
+    const tursoColor   = h.tursoConnected  ? 'var(--success)' : 'var(--danger)';
+    const memPct       = h.memory ? Math.round((h.memory.heapUsedMB / h.memory.heapTotalMB) * 100) : 0;
+    const memColor     = memPct > 80 ? 'var(--danger)' : memPct > 60 ? 'var(--warning)' : 'var(--success)';
+    const pingColor    = ping < 200 ? 'var(--success)' : ping < 600 ? 'var(--warning)' : 'var(--danger)';
+
+    document.getElementById('healthStatsRow').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">⚙️ Server Status</div>
+        <div class="stat-value" style="color:${statusColor};font-size:1.5rem">${h.status === 'ok' ? '✅ Online' : '❌ Error'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">🗄️ Turso Cloud DB</div>
+        <div class="stat-value" style="color:${tursoColor};font-size:1.5rem">${h.tursoConnected ? '✅ Connected' : '❌ Disconnected'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">⏱️ Server Uptime</div>
+        <div class="stat-value accent" style="font-size:1.4rem">${h.uptimeFormatted || h.uptime + 's'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">📡 API Ping Latency</div>
+        <div class="stat-value" style="color:${pingColor};font-size:1.5rem">${ping} ms</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">🧠 Heap Usage</div>
+        <div class="stat-value" style="color:${memColor};font-size:1.5rem">${memPct}%</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:4px">${h.memory?.heapUsedMB} / ${h.memory?.heapTotalMB} MB</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">🏪 Businesses</div>
+        <div class="stat-value accent" style="font-size:1.5rem">${h.registeredBusinesses ?? '—'}</div>
+      </div>
+    `;
+
+    // ── Memory bars ─────────────────────────────────────────
+    if (h.memory) {
+      const bars = [
+        { label: 'Heap Used',  val: h.memory.heapUsedMB,  max: h.memory.heapTotalMB, unit: 'MB', color: memColor },
+        { label: 'Heap Total', val: h.memory.heapTotalMB, max: h.memory.rssMB,        unit: 'MB', color: 'var(--primary)' },
+        { label: 'RSS (Total Process)', val: h.memory.rssMB, max: Math.max(h.memory.rssMB, 512), unit: 'MB', color: 'var(--accent-cyan)' },
+        { label: 'External',   val: h.memory.externalMB,  max: 50,                    unit: 'MB', color: 'var(--warning)' },
+      ];
+      document.getElementById('healthMemBars').innerHTML = bars.map(b => {
+        const pct = Math.min(100, Math.round((b.val / b.max) * 100));
+        return `
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:0.85rem">
+              <span style="color:var(--muted)">${b.label}</span>
+              <strong>${b.val} ${b.unit}</strong>
+            </div>
+            <div class="traffic-bar-bg">
+              <div class="traffic-bar-fill" style="width:${pct}%;background:${b.color};border-radius:10px"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── FIFO Queue depth cards ──────────────────────────────
+    const qd = h.fifoQueueDepths || {};
+    const keys = Object.keys(qd);
+    const fifoGrid = document.getElementById('healthFifoGrid');
+    if (!keys.length) {
+      fifoGrid.innerHTML = '<div style="color:var(--muted);font-size:0.9rem;padding:10px">No queues warmed up yet — will populate on first user scan.</div>';
+    } else {
+      fifoGrid.innerHTML = keys.map(slug => {
+        const depth = qd[slug];
+        const pct   = Math.min(100, Math.round((depth / 10) * 100));
+        const col   = depth >= 8 ? 'var(--success)' : depth >= 4 ? 'var(--warning)' : 'var(--danger)';
+        const emoji = depth >= 8 ? '✅' : depth >= 4 ? '⚠️' : '🔴';
+        return `
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px">
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:4px">${emoji} <code style="color:var(--primary)">${slug}</code></div>
+            <div style="font-family:'Outfit',sans-serif;font-size:1.8rem;font-weight:800;color:${col}">${depth}<span style="font-size:0.9rem;font-weight:500;color:var(--muted)">/10</span></div>
+            <div class="traffic-bar-bg" style="margin-top:8px">
+              <div class="traffic-bar-fill" style="width:${pct}%;background:${col};border-radius:10px"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── System Info table ───────────────────────────────────
+    const rows = [
+      ['Node.js Version', h.nodeVersion || '—'],
+      ['Environment',     h.env || '—'],
+      ['Platform',        h.platform || '—'],
+      ['Server Time',     new Date(h.ts).toLocaleString()],
+      ['Raw Uptime',      h.uptime + ' seconds'],
+    ];
+    document.getElementById('healthSysBody').innerHTML = rows.map(([k, v]) =>
+      `<tr><td style="color:var(--muted);font-size:0.88rem">${k}</td><td><strong>${v}</strong></td></tr>`
+    ).join('');
+
+    document.getElementById('healthLastPing').textContent = `Last refreshed: ${new Date().toLocaleTimeString()} · Ping: ${ping}ms`;
   }
 
   async function loadStatus() {
