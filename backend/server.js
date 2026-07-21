@@ -453,8 +453,16 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
   const type       = config.type || 'business';
   const name       = config.name || cleanSlug;
   const lang       = config.language || 'English';
+  const tone       = config.reviewTone || 'casual';
   const menuItems  = config.menuItems ? `Popular Menu/Services: ${config.menuItems}.` : '';
   const highlights = config.highlights ? `Special Highlights: ${config.highlights}.` : '';
+
+  let toneInstruction = "Casual & Short: 2 snappy sentences, natural mobile user style.";
+  if (tone === 'enthusiastic') {
+    toneInstruction = "Enthusiastic & Detailed: Warm, expressive happy customer praising staff, clean aesthetic, and great value.";
+  } else if (tone === 'minimalist') {
+    toneInstruction = "Minimalist 5-Star: 20 to 30 words, direct, clean, punchy recommendation.";
+  }
 
   const selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
   const selectedPhrase  = CASUAL_PHRASES[Math.floor(Math.random() * CASUAL_PHRASES.length)];
@@ -464,6 +472,7 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
     `You are a real everyday customer writing a quick 5-star Google review for "${name}", a ${type}.\n` +
     `${menuItems} ${highlights}\n` +
     `Language: Write the review naturally in ${lang}.\n` +
+    `Tone preference: ${toneInstruction}\n` +
     `Style persona: ${selectedPersona}\n` +
     `Include a natural casual phrase like "${selectedPhrase}". Naturally reference one of the services, items, or highlights if applicable.\n` +
     `CRITICAL: Sound completely human, non-AI, between 25 and 45 words. Focus ONLY on ${name} (${type}). DO NOT use cliché phrases like '10/10' or '5 stars'. Output ONLY the review text. No quotes. Seed: ${randomSeed}`;
@@ -1017,10 +1026,19 @@ initAndMigrateTurso().then(() => {
     if (!dbStore[slug].backupReviews || dbStore[slug].backupReviews.length === 0) {
       generate50BackupReviews(slug).catch(() => {});
     }
+
+    // 🚀 ASYNC PRE-WARMING ENGINE: Pre-fill FIFO queue buffer for instant 0ms AI reviews!
+    setImmediate(async () => {
+      try {
+        for (let i = 0; i < 3; i++) {
+          await generateAndEnqueueReview(slug, { deviceType: 'ServerPreWarm', timeOfDay: 'Startup' });
+        }
+      } catch {}
+    });
   });
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v16.0 (50 Offline Backup Reviews Engine + Context Realism) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v17.0 (Upgraded FIFO Pre-Warming + Tone Selector Engine) running on port ${PORT}`);
 });
