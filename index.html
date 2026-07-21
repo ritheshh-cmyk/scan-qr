@@ -171,38 +171,33 @@
       doRedirect();
     }
 
-    // ── DYNAMICALLY LOAD BUSINESS CONFIG FROM BACKEND ──────────────────────────
-    fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(cfg => {
-        if (cfg) {
-          if (cfg.googleReviewLink) googleReviewLink = cfg.googleReviewLink;
-          if (cfg.name) {
-            document.getElementById('heading').textContent = `Opening ${cfg.name} Reviews…`;
-            document.getElementById('pageTitle').textContent = `Opening ${cfg.name} Reviews…`;
-          }
-          if (cfg.type) {
-            document.getElementById('bizIcon').textContent = getCategoryIcon(cfg.type);
-          }
+    // ── DYNAMICALLY LOAD BUSINESS CONFIG & REVIEW IN PARALLEL ──────────────────
+    Promise.all([
+      fetch(`${BACKEND_URL}/api/config/${BUSINESS_SLUG}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}`).then(r => r.ok ? r.json() : null).catch(() => null)
+    ]).then(([cfg, revData]) => {
+      if (cfg) {
+        if (cfg.googleReviewLink && cfg.googleReviewLink.trim()) {
+          googleReviewLink = cfg.googleReviewLink.trim();
         }
-      })
-      .catch(() => {});
-
-    // ── FETCH FIFO QUEUE REVIEW FROM BACKEND (Pops Gemini AI review from buffer) ─
-    fetch(`${BACKEND_URL}/api/review/${BUSINESS_SLUG}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data && data.review) {
-          activeReview = data.review;
+        if (cfg.name) {
+          document.getElementById('heading').textContent = `Opening ${cfg.name} Reviews…`;
+          document.getElementById('pageTitle').textContent = `Opening ${cfg.name} Reviews…`;
         }
-        doRedirect();
-      })
-      .catch(() => {
-        doRedirect();
-      });
+        if (cfg.type) {
+          document.getElementById('bizIcon').textContent = getCategoryIcon(cfg.type);
+        }
+      }
+      if (revData && revData.review) {
+        activeReview = revData.review;
+      }
+      doRedirect();
+    }).catch(() => {
+      doRedirect();
+    });
 
-    // ── MAXIMUM SAFETY TIMER (150ms timeout to guarantee sub-150ms speed!) ────
-    setTimeout(doRedirect, 150);
+    // ── SAFETY FALLBACK TIMER (1500ms max in case of network latency) ──────────
+    setTimeout(doRedirect, 1500);
   </script>
 </body>
 </html>
