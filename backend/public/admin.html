@@ -394,6 +394,147 @@
     #printableStand, #printableStand * { visibility: visible; }
     #printableStand { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; color: black; }
   }
+
+  /* ===== MOBILE RESPONSIVE ===== */
+  @media (max-width: 768px) {
+
+    /* Topbar */
+    .topbar {
+      padding: 0 14px;
+      height: auto;
+      min-height: 56px;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-top: 10px;
+      padding-bottom: 10px;
+    }
+    .auto-refresh-toggle { display: none; }
+    .backend-badge { font-size: 0.7rem; padding: 4px 10px; }
+    .brand { font-size: 1rem; }
+    .brand-icon { width: 28px; height: 28px; font-size: 0.95rem; }
+    .spacer { display: none; }
+
+    /* Tabs nav */
+    .tabs-nav {
+      padding: 6px 10px;
+      gap: 4px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      flex-wrap: nowrap;
+    }
+    .tabs-nav::-webkit-scrollbar { display: none; }
+    .tab-item {
+      padding: 9px 12px;
+      font-size: 0.78rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* Content area */
+    .content-area { padding: 14px 12px; }
+
+    /* Cards */
+    .card { padding: 16px 14px; border-radius: 14px; }
+    .card-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .card-header h3 { font-size: 1rem; }
+
+    /* Stats grid */
+    .stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+    .stat-card { padding: 16px 14px; border-radius: 12px; }
+    .stat-value { font-size: 1.6rem; }
+
+    /* Biz grid */
+    .biz-grid { grid-template-columns: 1fr; gap: 14px; }
+    .biz-card-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+
+    /* Add form grid — single column */
+    .add-form-grid { grid-template-columns: 1fr !important; }
+    .add-form { padding: 16px 14px; }
+
+    /* Tables — horizontal scroll */
+    .status-table-wrap, .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .status-table { min-width: 560px; }
+    .status-table th, .status-table td { padding: 10px 12px; font-size: 0.8rem; }
+
+    /* Modals */
+    .modal {
+      width: calc(100% - 16px);
+      max-height: 92vh;
+      padding: 20px 16px;
+      border-radius: 16px;
+    }
+    .modal h3 { font-size: 1.05rem; }
+    .modal-footer { flex-direction: column; gap: 10px; }
+    .modal-footer .btn { width: 100%; justify-content: center; }
+
+    /* Modal grids — single column */
+    .modal .add-form-grid,
+    .modal [style*="grid-template-columns"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* QR Studio — stack vertically */
+    #tab-content-qrstudio [style*="grid-template-columns:1fr 340px"],
+    #tab-content-qrstudio [style*="grid-template-columns: 1fr 340px"] {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 20px !important;
+    }
+    #qrPreviewWrap { display: flex !important; justify-content: center !important; }
+    #tab-content-qrstudio [style*="grid-template-columns:1fr 1fr 1fr"],
+    #tab-content-qrstudio [style*="grid-template-columns: 1fr 1fr 1fr"] {
+      grid-template-columns: 1fr 1fr !important;
+    }
+    #tab-content-qrstudio [style*="grid-template-columns:1fr 1fr"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Colors row in QR studio — 2 col */
+    #tab-content-qrstudio [style*="grid-template-columns:1fr 1fr 1fr"] {
+      grid-template-columns: 1fr 1fr !important;
+    }
+
+    /* Bank inspector grids */
+    #tab-content-bank [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+    #bankSummaryGrid { grid-template-columns: 1fr !important; }
+
+    /* Businesses tab header */
+    #tab-content-businesses > div:first-child { flex-direction: column !important; gap: 12px !important; align-items: flex-start !important; }
+    #tab-content-businesses > div:first-child > div { flex-direction: column !important; width: 100%; }
+    #tab-content-businesses > div:first-child .btn { width: 100%; justify-content: center; }
+
+    /* Analytics card header */
+    #tab-content-analytics .card-header { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+    #tab-content-analytics [style*="display:flex"] { flex-wrap: wrap !important; }
+
+    /* Bank tab top header */
+    #tab-content-bank > div:first-child { flex-direction: column !important; gap: 14px !important; }
+    #tab-content-bank > div:first-child > div:last-child { flex-direction: column !important; width: 100%; }
+    #tab-content-bank > div:first-child .btn { width: 100%; justify-content: center; }
+
+    /* Toast — bottom center on mobile */
+    #toast {
+      bottom: 16px;
+      right: 12px;
+      left: 12px;
+      text-align: center;
+    }
+
+    /* Buttons in biz actions */
+    .biz-actions { gap: 6px; }
+    .biz-actions .btn { font-size: 0.78rem; padding: 7px 12px; }
+
+    /* Status tab header */
+    #tab-content-status .card-header { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+  }
+
+  @media (max-width: 480px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    .stat-value { font-size: 1.4rem; }
+    .btn-sm { font-size: 0.78rem; padding: 7px 12px; }
+    .tab-item { padding: 8px 10px; font-size: 0.72rem; }
+  }
 </style>
 </head>
 <body>
