@@ -611,6 +611,48 @@
               </div>
             </div>
 
+            <!-- Logo Upload -->
+            <div style="background:var(--bg);border:1px dashed var(--border);border-radius:12px;padding:14px">
+              <div style="font-size:0.82rem;font-weight:700;margin-bottom:10px">🖼️ Center Logo / Brand Image</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center">
+                <div>
+                  <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:5px">Upload Logo (PNG/JPG/SVG)</label>
+                  <input id="qrLogoUpload" type="file" accept="image/*" onchange="handleLogoUpload(event)" style="font-size:0.82rem;width:100%">
+                  <div id="qrLogoPreviewThumb" style="margin-top:8px;display:none">
+                    <img id="qrLogoThumb" style="height:44px;border-radius:8px;border:1px solid var(--border);object-fit:contain;background:#fff;padding:4px">
+                    <button onclick="clearLogo()" style="margin-left:8px;background:none;border:1px solid var(--danger);color:var(--danger);border-radius:6px;font-size:0.75rem;padding:3px 8px;cursor:pointer">✕ Remove</button>
+                  </div>
+                </div>
+                <div>
+                  <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:5px">Logo Size: <strong id="qrLogoSizeLabel">22%</strong></label>
+                  <input id="qrLogoSize" type="range" min="10" max="35" value="22" step="1" oninput="document.getElementById('qrLogoSizeLabel').textContent=this.value+'%';renderQrStudio()" style="width:100%;accent-color:var(--primary)">
+                  <div style="font-size:0.72rem;color:var(--muted);margin-top:4px">⚠️ Uses H error correction automatically</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Business Name on QR -->
+            <div style="background:var(--bg);border:1px dashed var(--border);border-radius:12px;padding:14px">
+              <div style="font-size:0.82rem;font-weight:700;margin-bottom:10px">🏪 Business Name on QR</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+                <div>
+                  <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:5px">Name Text</label>
+                  <input id="qrBizName" type="text" placeholder="e.g. Prison Mandi" oninput="renderQrStudio()">
+                </div>
+                <div>
+                  <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:5px">Name Color</label>
+                  <input id="qrBizNameColor" type="color" value="#ffffff" onchange="renderQrStudio()" style="height:38px;padding:3px;cursor:pointer;width:100%">
+                </div>
+                <div>
+                  <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:5px">Name Position</label>
+                  <select id="qrBizNamePos" onchange="renderQrStudio()">
+                    <option value="top">⬆️ Top of Frame</option>
+                    <option value="bottom" selected>⬇️ Bottom of Frame</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <!-- Active URL -->
             <div>
               <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">🔗 Active Target URL</label>
@@ -1071,6 +1113,31 @@
   }
 
   // ── QR STUDIO TAB ───────────────────────────────────────────────────────────
+  let uploadedLogoDataUrl = null;
+
+  function handleLogoUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      uploadedLogoDataUrl = e.target.result;
+      const thumb = document.getElementById('qrLogoThumb');
+      thumb.src = uploadedLogoDataUrl;
+      document.getElementById('qrLogoPreviewThumb').style.display = 'flex';
+      document.getElementById('qrLogoPreviewThumb').style.alignItems = 'center';
+      // Force H error correction when logo is uploaded
+      document.getElementById('qrCorrectLevel').value = 'H';
+      renderQrStudio();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearLogo() {
+    uploadedLogoDataUrl = null;
+    document.getElementById('qrLogoUpload').value = '';
+    document.getElementById('qrLogoPreviewThumb').style.display = 'none';
+    renderQrStudio();
+  }
   async function loadQrStudio() {
     try {
       const list = await apiJSON('/admin/api/businesses');
@@ -1107,28 +1174,49 @@
     const lightColor   = document.getElementById('qrLightColor').value   || '#ffffff';
     const frameColor   = document.getElementById('qrFrameColor').value   || '#6366f1';
     const size         = parseInt(document.getElementById('qrSizeSlider').value) || 220;
-    const correctLvl   = document.getElementById('qrCorrectLevel').value || 'M';
+    const correctLvl   = uploadedLogoDataUrl ? 'H' : (document.getElementById('qrCorrectLevel').value || 'M');
     const cornerStyle  = document.getElementById('qrCornerStyle').value  || 'rounded';
     const labelText    = document.getElementById('qrLabel').value.trim();
     const showFrame    = document.getElementById('qrShowFrame').checked;
+    const logoSizePct  = parseInt(document.getElementById('qrLogoSize').value) || 22;
+    const bizName      = document.getElementById('qrBizName').value.trim();
+    const bizNameColor = document.getElementById('qrBizNameColor').value || '#ffffff';
+    const bizNamePos   = document.getElementById('qrBizNamePos').value   || 'bottom';
 
-    // Map correctLevel string to QRCode constant
     const levelMap = { H: QRCode.CorrectLevel.H, Q: QRCode.CorrectLevel.Q, M: QRCode.CorrectLevel.M, L: QRCode.CorrectLevel.L };
 
-    // Build wrapper with optional colored frame
+    // Build wrapper
     const wrap = document.getElementById('qrPreviewWrap');
     wrap.innerHTML = '';
 
     const frameDiv = document.createElement('div');
+    const bizNameH = bizName ? 34 : 0;
     if (showFrame) {
-      frameDiv.style.cssText = `display:inline-block;padding:14px;background:${frameColor};border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,0.35)`;
+      frameDiv.style.cssText = `display:inline-block;padding:${bizName && bizNamePos==='top' ? '8px' : '14px'} 14px ${bizName && bizNamePos==='bottom' ? '8px' : '14px'};background:${frameColor};border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,0.35);position:relative`;
     } else {
-      frameDiv.style.cssText = `display:inline-block;padding:14px;background:#fff;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.25)`;
+      frameDiv.style.cssText = `display:inline-block;padding:14px;background:#fff;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.25);position:relative`;
+    }
+
+    // Biz name top
+    if (bizName && bizNamePos === 'top') {
+      const nameEl = document.createElement('div');
+      nameEl.textContent = bizName;
+      nameEl.style.cssText = `font-family:system-ui,sans-serif;font-weight:800;font-size:0.95rem;color:${bizNameColor};text-align:center;padding:4px 0 8px;letter-spacing:0.04em`;
+      frameDiv.appendChild(nameEl);
     }
 
     const inner = document.createElement('div');
-    inner.style.cssText = `background:#fff;border-radius:10px;padding:8px;display:inline-block`;
+    inner.style.cssText = `background:#fff;border-radius:10px;padding:8px;display:inline-block;position:relative`;
     frameDiv.appendChild(inner);
+
+    // Biz name bottom
+    if (bizName && bizNamePos === 'bottom') {
+      const nameEl = document.createElement('div');
+      nameEl.textContent = bizName;
+      nameEl.style.cssText = `font-family:system-ui,sans-serif;font-weight:800;font-size:0.95rem;color:${bizNameColor};text-align:center;padding:8px 0 4px;letter-spacing:0.04em`;
+      frameDiv.appendChild(nameEl);
+    }
+
     wrap.appendChild(frameDiv);
 
     qrObj = new QRCode(inner, {
@@ -1137,30 +1225,48 @@
       height: size,
       colorDark: darkColor,
       colorLight: lightColor,
-      correctLevel: levelMap[correctLvl] || QRCode.CorrectLevel.M
+      correctLevel: levelMap[correctLvl] || QRCode.CorrectLevel.H
     });
 
-    // Apply corner style via CSS after short delay (QRCode.js renders async)
+    // After QRCode renders (it's sync on canvas creation), apply corner style + logo
     setTimeout(() => {
       const canvas = inner.querySelector('canvas');
       if (!canvas) return;
-      if (cornerStyle === 'rounded') {
-        canvas.style.borderRadius = '12px';
-      } else if (cornerStyle === 'dots') {
-        canvas.style.borderRadius = '50%';
-        canvas.style.transform = 'scale(0.96)';
-      } else {
-        canvas.style.borderRadius = '0';
+
+      if (cornerStyle === 'rounded') canvas.style.borderRadius = '10px';
+      else if (cornerStyle === 'dots') { canvas.style.borderRadius = '50%'; canvas.style.transform = 'scale(0.96)'; }
+      else canvas.style.borderRadius = '0';
+
+      // Overlay logo in center if uploaded
+      if (uploadedLogoDataUrl) {
+        const ctx = canvas.getContext('2d');
+        const logoW = canvas.width * (logoSizePct / 100);
+        const logoH = logoW;
+        const logoX = (canvas.width  - logoW) / 2;
+        const logoY = (canvas.height - logoH) / 2;
+
+        const img = new Image();
+        img.onload = () => {
+          // White circle bg behind logo for scannability
+          ctx.save();
+          ctx.fillStyle = '#ffffff';
+          const pad = logoW * 0.18;
+          ctx.beginPath();
+          ctx.roundRect(logoX - pad, logoY - pad, logoW + pad*2, logoH + pad*2, 10);
+          ctx.fill();
+          ctx.drawImage(img, logoX, logoY, logoW, logoH);
+          ctx.restore();
+        };
+        img.src = uploadedLogoDataUrl;
       }
     }, 80);
 
-    // Label
+    // Label below preview
     const labelEl = document.getElementById('qrLabelDisplay');
     if (labelText) {
       labelEl.textContent = labelText;
       labelEl.style.display = 'block';
-      if (showFrame) labelEl.style.color = frameColor;
-      else labelEl.style.color = darkColor;
+      labelEl.style.color = showFrame ? frameColor : darkColor;
     } else {
       labelEl.textContent = '';
       labelEl.style.display = 'none';
@@ -1170,48 +1276,91 @@
   function downloadQrPng() {
     const canvas = document.querySelector('#qrPreviewWrap canvas');
     if (!canvas) { toast('QR Code not ready', 'error'); return; }
-    const slug = currentQrMode === 'registered' ? (document.getElementById('qrBizSelect').value || 'qr') : 'custom_qr';
-
-    // Composite: merge frame + canvas into a single download canvas
+    const slug       = currentQrMode === 'registered' ? (document.getElementById('qrBizSelect').value || 'qr') : 'custom_qr';
     const size       = canvas.width;
-    const pad        = 30;
+    const pad        = 32;
     const labelText  = document.getElementById('qrLabel').value.trim();
+    const bizName    = document.getElementById('qrBizName').value.trim();
+    const bizNamePos = document.getElementById('qrBizNamePos').value || 'bottom';
+    const bizNameColor = document.getElementById('qrBizNameColor').value || '#ffffff';
     const frameColor = document.getElementById('qrFrameColor').value || '#6366f1';
     const darkColor  = document.getElementById('qrDarkColor').value  || '#6366f1';
     const showFrame  = document.getElementById('qrShowFrame').checked;
-    const extraH     = labelText ? 40 : 0;
+    const logoSizePct = parseInt(document.getElementById('qrLogoSize').value) || 22;
+    const nameH      = bizName ? 42 : 0;
+    const labelH     = labelText ? 44 : 0;
     const totalW     = size + pad * 2;
-    const totalH     = size + pad * 2 + extraH;
+    const totalH     = size + pad * 2 + nameH + labelH;
 
     const out = document.createElement('canvas');
     out.width  = totalW;
     out.height = totalH;
     const ctx  = out.getContext('2d');
 
-    // Background
+    // Background frame
     ctx.fillStyle = showFrame ? frameColor : '#ffffff';
     ctx.fillRect(0, 0, totalW, totalH);
-    // White inner
-    ctx.fillStyle = '#ffffff';
-    const r = 12;
-    ctx.beginPath();
-    ctx.roundRect(pad - 8, pad - 8, size + 16, size + 16, r);
-    ctx.fill();
-    // QR
-    ctx.drawImage(canvas, pad, pad, size, size);
-    // Label
-    if (labelText) {
-      ctx.fillStyle = showFrame ? '#ffffff' : darkColor;
-      ctx.font = `bold 16px system-ui, sans-serif`;
+
+    // Business name top
+    let qrOffsetY = pad;
+    if (bizName && bizNamePos === 'top') {
+      ctx.fillStyle = bizNameColor;
+      ctx.font = 'bold 18px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(labelText, totalW / 2, size + pad + 28);
+      ctx.fillText(bizName, totalW / 2, pad + 20);
+      qrOffsetY = pad + nameH;
     }
 
-    const link = document.createElement('a');
-    link.download = `ScanQR_${slug}.png`;
-    link.href = out.toDataURL('image/png');
-    link.click();
-    toast('QR Code PNG Downloaded!', 'success');
+    // White inner bg
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.roundRect(pad - 8, qrOffsetY - 8, size + 16, size + 16, 12);
+    ctx.fill();
+
+    // QR code
+    ctx.drawImage(canvas, pad, qrOffsetY, size, size);
+
+    // Logo overlay
+    const doLogoOverlay = (done) => {
+      if (!uploadedLogoDataUrl) { done(); return; }
+      const img = new Image();
+      img.onload = () => {
+        const logoW = size * (logoSizePct / 100);
+        const logoH = logoW;
+        const logoX = pad + (size - logoW) / 2;
+        const logoY = qrOffsetY + (size - logoH) / 2;
+        const logoPad = logoW * 0.18;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.roundRect(logoX - logoPad, logoY - logoPad, logoW + logoPad*2, logoH + logoPad*2, 10);
+        ctx.fill();
+        ctx.drawImage(img, logoX, logoY, logoW, logoH);
+        done();
+      };
+      img.src = uploadedLogoDataUrl;
+    };
+
+    doLogoOverlay(() => {
+      // Business name bottom
+      if (bizName && bizNamePos === 'bottom') {
+        ctx.fillStyle = bizNameColor;
+        ctx.font = 'bold 18px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(bizName, totalW / 2, qrOffsetY + size + pad - 6);
+      }
+      // Label
+      if (labelText) {
+        ctx.fillStyle = showFrame ? '#ffffff' : darkColor;
+        ctx.font = 'bold 15px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(labelText, totalW / 2, totalH - 14);
+      }
+      const link = document.createElement('a');
+      link.download = `ScanQR_${slug}.png`;
+      link.href = out.toDataURL('image/png');
+      link.click();
+      toast('QR Code PNG Downloaded!', 'success');
+    });
   }
 
   function downloadQrSvg() {
