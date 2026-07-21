@@ -318,13 +318,13 @@ function App() {
 
     const finalType = newBiz.type === 'custom' ? newBiz.customType.trim() || 'store' : newBiz.type;
     const body = {
-      name: newBiz.name.trim() || finalSlug,
+      name: (newBiz.name || '').trim() || finalSlug,
       type: finalType,
       language: newBiz.language,
-      menuItems: newBiz.menuItems.trim() || undefined,
-      highlights: newBiz.highlights.trim() || undefined,
-      googleReviewLink: newBiz.googleReviewLink.trim(),
-      geminiApiKey: newBiz.geminiApiKey.trim() || undefined,
+      menuItems: newBiz.menuItems ? newBiz.menuItems.trim() : undefined,
+      highlights: newBiz.highlights ? newBiz.highlights.trim() : undefined,
+      googleReviewLink: (newBiz.googleReviewLink || '').trim(),
+      geminiApiKey: newBiz.geminiApiKey ? newBiz.geminiApiKey.trim() : undefined,
       siteUrl: `https://scanqr-beta.vercel.app?biz=${finalSlug}`
     };
 
@@ -343,13 +343,13 @@ function App() {
     e.preventDefault();
     const finalType = editBiz.type === 'custom' ? editBiz.customType.trim() || 'store' : editBiz.type;
     const body = {
-      name: editBiz.name.trim() || editBiz.slug,
+      name: (editBiz.name || '').trim() || editBiz.slug,
       type: finalType,
       language: editBiz.language,
-      menuItems: editBiz.menuItems.trim() || undefined,
-      highlights: editBiz.highlights.trim() || undefined,
-      googleReviewLink: editBiz.googleReviewLink.trim(),
-      geminiApiKey: editBiz.geminiApiKey.trim() || undefined,
+      menuItems: editBiz.menuItems ? editBiz.menuItems.trim() : undefined,
+      highlights: editBiz.highlights ? editBiz.highlights.trim() : undefined,
+      googleReviewLink: (editBiz.googleReviewLink || '').trim(),
+      geminiApiKey: editBiz.geminiApiKey ? editBiz.geminiApiKey.trim() : undefined,
       siteUrl: `https://scanqr-beta.vercel.app?biz=${editBiz.slug}`
     };
 
