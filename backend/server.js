@@ -9,7 +9,7 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // Default admin key fallback
-const DEFAULT_ADMIN_KEY = process.env.ADMIN_API_KEY || 'Lucky@000';
+const DEFAULT_ADMIN_KEY = () => process.env.ADMIN_API_KEY || 'Lucky@000';
 
 // Built-in registered businesses fallback
 const DEFAULT_BUSINESSES = {
@@ -86,6 +86,7 @@ const dbStore = loadLocalDatabase();
 async function initAndMigrateTurso() {
   if (!tursoClient) return;
   try {
+    // 1. Businesses table
     await tursoClient.execute(`
       CREATE TABLE IF NOT EXISTS businesses (
         slug TEXT PRIMARY KEY,
@@ -100,7 +101,26 @@ async function initAndMigrateTurso() {
       );
     `);
 
-    // Load existing records from Turso
+    // 2. Global App Settings / API Keys table
+    await tursoClient.execute(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Load API keys from Turso app_settings
+    const keysRes = await tursoClient.execute('SELECT key, value FROM app_settings');
+    if (keysRes.rows && keysRes.rows.length > 0) {
+      keysRes.rows.forEach(r => {
+        if (r.key === 'gemini_api_key' && r.value) process.env.GEMINI_API_KEY = r.value;
+        if (r.key === 'admin_api_key' && r.value)  process.env.ADMIN_API_KEY  = r.value;
+      });
+      console.log('🔑 Loaded Global API Keys from Turso Cloud Database');
+    }
+
+    // Load existing records from Turso businesses
     const res = await tursoClient.execute('SELECT slug, data FROM businesses');
     if (res.rows && res.rows.length > 0) {
       res.rows.forEach(row => {
@@ -113,7 +133,6 @@ async function initAndMigrateTurso() {
       });
       console.log(`✅ Loaded ${res.rows.length} businesses from Turso Cloud Database`);
     } else {
-      // Migrate local seed data into Turso
       console.log('🔄 Seeding initial businesses into Turso Cloud Database…');
       for (const [slug, cfg] of Object.entries(dbStore)) {
         await upsertTursoBusiness(slug, cfg);
@@ -121,6 +140,18 @@ async function initAndMigrateTurso() {
     }
   } catch (err) {
     console.error('[Turso Migration Error]:', err.message);
+  }
+}
+
+async function upsertTursoAppSetting(key, value) {
+  if (!tursoClient || !key || !value) return;
+  try {
+    await tursoClient.execute({
+      sql: 'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+      args: [key, value]
+    });
+  } catch (err) {
+    console.error(`[Turso Setting Save Error] ${key}:`, err.message);
   }
 }
 
@@ -350,7 +381,7 @@ function seedQueueIfEmpty(slug, config) {
 
 function adminAuth(req, res, next) {
   const key = req.headers['x-api-key'] || req.query.key;
-  if (!key || key !== DEFAULT_ADMIN_KEY) {
+  if (!key || key !== DEFAULT_ADMIN_KEY()) {
     return res.status(401).json({ error: 'Unauthorized — provide valid x-api-key header or ?key= query param' });
   }
   next();
@@ -378,7 +409,7 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
   const cleanSlug = sanitizeSlug(slug);
   const config    = getBizConfig(cleanSlug);
 
-  // AUTOMATIC KEY FAILOVER MATRIX: Primary Key (custom per business) -> Backup Key (global Render env)
+  // AUTOMATIC KEY FAILOVER MATRIX: Primary Key (custom per business) -> Backup Key (global Render env / Turso)
   const primaryKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
   const backupKey  = process.env.GEMINI_API_KEY;
 
@@ -665,7 +696,7 @@ app.post('/admin/api/db/import', adminAuth, async (req, res) => {
   res.json({ success: true, count: Object.keys(dbStore).length, message: 'Database restored to Turso Cloud & Disk successfully.' });
 });
 
-// ── ADMIN: Settings API ────────────────────────────────────────────────────────
+// ── ADMIN: Settings API (Turso Cloud Database Backed) ──────────────────────────
 app.get('/admin/api/settings', adminAuth, (req, res) => {
   res.json({
     geminiApiKey: process.env.GEMINI_API_KEY || '',
@@ -675,11 +706,17 @@ app.get('/admin/api/settings', adminAuth, (req, res) => {
   });
 });
 
-app.post('/admin/api/settings', adminAuth, (req, res) => {
+app.post('/admin/api/settings', adminAuth, async (req, res) => {
   const { geminiApiKey, adminApiKey } = req.body;
-  if (geminiApiKey) process.env.GEMINI_API_KEY = geminiApiKey;
-  if (adminApiKey)  process.env.ADMIN_API_KEY  = adminApiKey;
-  res.json({ success: true, note: 'Updated in-memory. Update env vars on Render to persist.' });
+  if (geminiApiKey) {
+    process.env.GEMINI_API_KEY = geminiApiKey;
+    await upsertTursoAppSetting('gemini_api_key', geminiApiKey);
+  }
+  if (adminApiKey) {
+    process.env.ADMIN_API_KEY  = adminApiKey;
+    await upsertTursoAppSetting('admin_api_key', adminApiKey);
+  }
+  res.json({ success: true, note: 'Saved & Persisted permanently to Turso Cloud DB!' });
 });
 
 // ── ADMIN: Business APIs (Turso Cloud DB + Disk Backed) ────────────────────────
@@ -718,7 +755,7 @@ app.post('/admin/api/config/:slug', adminAuth, async (req, res) => {
   // 1. Update in-memory persistent dbStore
   dbStore[cleanSlug] = req.body;
 
-  // 2. Persist to Turso Cloud SQLite Database!
+  // 2. Persist to Turso Cloud SQLite Database (including custom geminiApiKey)!
   await upsertTursoBusiness(cleanSlug, req.body);
 
   // 3. Persist to local disk database (db/businesses.json) synchronously
@@ -804,5 +841,5 @@ initAndMigrateTurso().then(() => {
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v13.0 (Turso Cloud SQLite Active) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v13.1 (Turso Cloud DB + API Key Persistence) running on port ${PORT}`);
 });
