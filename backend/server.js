@@ -3,6 +3,7 @@ const cors    = require('cors');
 const path    = require('path');
 const fs      = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { createClient }       = require('@libsql/client');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -35,10 +36,24 @@ const DEFAULT_BUSINESSES = {
   }
 };
 
-// ── TURBO PERSISTENT DATABASE ENGINE (Disk File Backed) ────────────────────────
+// ── TURSO CLOUD DATABASE & LOCAL DISK FALLBACK ENGINE ─────────────────────────
+const TURSO_URL   = process.env.TURSO_DATABASE_URL || 'libsql://scan-qr-db-rithesh.aws-ap-south-1.turso.io';
+const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN   || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3ODQ2MjAwMzQsImlkIjoiMDE5ZjgzYTQtNzkwMS03NjQ1LWFiYjgtN2EwOTcxZDEzZTc3Iiwia2lkIjoiWHRwRkYtcmF3Q09ITnJxSnB0VG5hVk4tNlEtaGtIT3l2TVBJUUpjdWJhayIsInJpZCI6IjQ1NmRjMjY4LTQ0ODUtNDBhOC1hZDNiLWQ4ZTk1NTg2YjgyZCJ9.KD3XGQDPR3etqSCIrkgCb7q6LiZfDekFE-m67PyCKXaHsj4_iqpO3haoLjBjg0ZzR7UKX0whSGhLg-3RZlAaCQ';
+
+let tursoClient = null;
+try {
+  tursoClient = createClient({
+    url: TURSO_URL,
+    authToken: TURSO_TOKEN
+  });
+  console.log(`☁️ Connected to Turso Cloud Database: ${TURSO_URL}`);
+} catch (err) {
+  console.warn(`[Turso Init Warning]: ${err.message}`);
+}
+
 const DB_FILE = path.join(__dirname, 'db', 'businesses.json');
 
-function loadDatabase() {
+function loadLocalDatabase() {
   try {
     if (fs.existsSync(DB_FILE)) {
       const content = fs.readFileSync(DB_FILE, 'utf8');
@@ -48,25 +63,112 @@ function loadDatabase() {
       }
     }
   } catch (err) {
-    console.error('[DB Load Error]:', err.message);
+    console.error('[Local DB Load Error]:', err.message);
   }
   return { ...DEFAULT_BUSINESSES };
 }
 
-function saveDatabase(dbData) {
+function saveLocalDatabase(dbData) {
   try {
     const dir = path.dirname(DB_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(DB_FILE, JSON.stringify(dbData, null, 2), 'utf8');
     return true;
   } catch (err) {
-    console.error('[DB Save Error]:', err.message);
+    console.error('[Local DB Save Error]:', err.message);
     return false;
   }
 }
 
-// In-Memory DB loaded from disk on startup
-const dbStore = loadDatabase();
+// In-Memory cache backed by Turso Cloud DB + Disk DB
+const dbStore = loadLocalDatabase();
+
+async function initAndMigrateTurso() {
+  if (!tursoClient) return;
+  try {
+    await tursoClient.execute(`
+      CREATE TABLE IF NOT EXISTS businesses (
+        slug TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        googleReviewLink TEXT,
+        siteUrl TEXT,
+        language TEXT,
+        geminiApiKey TEXT,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Load existing records from Turso
+    const res = await tursoClient.execute('SELECT slug, data FROM businesses');
+    if (res.rows && res.rows.length > 0) {
+      res.rows.forEach(row => {
+        try {
+          const parsed = JSON.parse(row.data);
+          if (parsed && row.slug) {
+            dbStore[row.slug] = parsed;
+          }
+        } catch {}
+      });
+      console.log(`✅ Loaded ${res.rows.length} businesses from Turso Cloud Database`);
+    } else {
+      // Migrate local seed data into Turso
+      console.log('🔄 Seeding initial businesses into Turso Cloud Database…');
+      for (const [slug, cfg] of Object.entries(dbStore)) {
+        await upsertTursoBusiness(slug, cfg);
+      }
+    }
+  } catch (err) {
+    console.error('[Turso Migration Error]:', err.message);
+  }
+}
+
+async function upsertTursoBusiness(slug, cfg) {
+  if (!tursoClient) return;
+  try {
+    await tursoClient.execute({
+      sql: `INSERT INTO businesses (slug, name, type, googleReviewLink, siteUrl, language, geminiApiKey, data)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(slug) DO UPDATE SET
+              name=excluded.name,
+              type=excluded.type,
+              googleReviewLink=excluded.googleReviewLink,
+              siteUrl=excluded.siteUrl,
+              language=excluded.language,
+              geminiApiKey=excluded.geminiApiKey,
+              data=excluded.data`,
+      args: [
+        slug,
+        cfg.name || slug,
+        cfg.type || 'store',
+        cfg.googleReviewLink || null,
+        cfg.siteUrl || `https://scanqr-beta.vercel.app?biz=${slug}`,
+        cfg.language || 'English',
+        cfg.geminiApiKey || null,
+        JSON.stringify(cfg)
+      ]
+    });
+  } catch (err) {
+    console.error(`[Turso Upsert Error] ${slug}:`, err.message);
+  }
+}
+
+async function deleteTursoBusiness(slug) {
+  if (!tursoClient) return;
+  try {
+    await tursoClient.execute({
+      sql: 'DELETE FROM businesses WHERE slug = ?',
+      args: [slug]
+    });
+  } catch (err) {
+    console.error(`[Turso Delete Error] ${slug}:`, err.message);
+  }
+}
+
+function saveDatabase(dbData) {
+  saveLocalDatabase(dbData);
+}
 
 // Candidate Gemini models ordered by performance & availability
 const MODEL_CANDIDATES = [
@@ -173,7 +275,7 @@ function sanitizeSlug(s) {
 function getBizConfig(slug) {
   const cleanSlug = sanitizeSlug(slug);
 
-  // 1. Check disk-backed persistent database first!
+  // 1. Check persistent database cache first!
   if (dbStore[cleanSlug]) {
     return dbStore[cleanSlug];
   }
@@ -354,7 +456,7 @@ async function generateAndEnqueueReview(slug, meta, customInput = {}) {
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', uptime: Math.floor(process.uptime()), ts: new Date().toISOString() });
+  res.json({ status: 'ok', uptime: Math.floor(process.uptime()), ts: new Date().toISOString(), tursoConnected: !!tursoClient });
 });
 
 // ── GET config for a slug ──────────────────────────────────────────────────────
@@ -547,7 +649,7 @@ app.get('/admin/api/db/export', adminAuth, (req, res) => {
   res.status(200).send(JSON.stringify(dbStore, null, 2));
 });
 
-app.post('/admin/api/db/import', adminAuth, (req, res) => {
+app.post('/admin/api/db/import', adminAuth, async (req, res) => {
   if (!req.body || typeof req.body !== 'object') {
     return res.status(400).json({ error: 'Invalid JSON payload' });
   }
@@ -555,18 +657,20 @@ app.post('/admin/api/db/import', adminAuth, (req, res) => {
   Object.assign(dbStore, req.body);
   saveDatabase(dbStore);
 
-  // Seed queues for imported businesses
-  Object.keys(dbStore).forEach(slug => {
-    seedQueueIfEmpty(slug, dbStore[slug]);
-  });
+  for (const [slug, cfg] of Object.entries(req.body)) {
+    await upsertTursoBusiness(slug, cfg);
+    seedQueueIfEmpty(slug, cfg);
+  }
 
-  res.json({ success: true, count: Object.keys(dbStore).length, message: 'Database restored and persisted successfully.' });
+  res.json({ success: true, count: Object.keys(dbStore).length, message: 'Database restored to Turso Cloud & Disk successfully.' });
 });
 
 // ── ADMIN: Settings API ────────────────────────────────────────────────────────
 app.get('/admin/api/settings', adminAuth, (req, res) => {
   res.json({
     geminiApiKey: process.env.GEMINI_API_KEY || '',
+    tursoDatabaseUrl: TURSO_URL,
+    tursoConnected: !!tursoClient,
     adminApiKeyConfigured: true
   });
 });
@@ -578,7 +682,7 @@ app.post('/admin/api/settings', adminAuth, (req, res) => {
   res.json({ success: true, note: 'Updated in-memory. Update env vars on Render to persist.' });
 });
 
-// ── ADMIN: Business APIs (Persistent Database Backed) ──────────────────────────
+// ── ADMIN: Business APIs (Turso Cloud DB + Disk Backed) ────────────────────────
 app.get('/admin/api/businesses', adminAuth, (req, res) => {
   const slugs = new Set([
     ...Object.keys(dbStore),
@@ -601,7 +705,7 @@ app.get('/admin/api/businesses', adminAuth, (req, res) => {
   res.json(list);
 });
 
-app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
+app.post('/admin/api/config/:slug', adminAuth, async (req, res) => {
   const cleanSlug = sanitizeSlug(req.params.slug);
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(400).json({ error: 'Empty body' });
@@ -614,29 +718,33 @@ app.post('/admin/api/config/:slug', adminAuth, (req, res) => {
   // 1. Update in-memory persistent dbStore
   dbStore[cleanSlug] = req.body;
 
-  // 2. Persist to disk database (db/businesses.json) synchronously!
+  // 2. Persist to Turso Cloud SQLite Database!
+  await upsertTursoBusiness(cleanSlug, req.body);
+
+  // 3. Persist to local disk database (db/businesses.json) synchronously
   saveDatabase(dbStore);
 
-  // 3. Keep env var synced
+  // 4. Keep env var synced
   process.env[`BIZ_${cleanSlug}`] = JSON.stringify(req.body);
   
-  // 4. Seed queue immediately
+  // 5. Seed queue immediately
   seedQueueIfEmpty(cleanSlug, req.body);
 
   res.json({ success: true, config: req.body });
 });
 
-app.delete('/admin/api/config/:slug', adminAuth, (req, res) => {
+app.delete('/admin/api/config/:slug', adminAuth, async (req, res) => {
   const cleanSlug = sanitizeSlug(req.params.slug);
   
   delete dbStore[cleanSlug];
+  await deleteTursoBusiness(cleanSlug);
   saveDatabase(dbStore);
 
   delete process.env[`BIZ_${cleanSlug}`];
   delete reviewQueues[cleanSlug];
   delete recentReviews[cleanSlug];
 
-  res.json({ success: true, message: `Business '${cleanSlug}' deleted successfully.` });
+  res.json({ success: true, message: `Business '${cleanSlug}' deleted from Turso Cloud & local DB.` });
 });
 
 app.get('/admin/api/status', adminAuth, async (req, res) => {
@@ -675,6 +783,7 @@ app.get('/admin/api/status', adminAuth, async (req, res) => {
 
   res.json({
     backend: { status: 'up', uptimeSeconds: Math.floor(process.uptime()), region: process.env.RENDER_REGION || 'unknown' },
+    tursoConnected: !!tursoClient,
     geminiConfigured: !!process.env.GEMINI_API_KEY,
     queues: Object.keys(reviewQueues).reduce((acc, k) => { acc[k] = reviewQueues[k].length; return acc; }, {}),
     sites: checks,
@@ -686,12 +795,14 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// ── INITIALIZE QUEUES ON STARTUP ───────────────────────────────────────────────
-Object.keys(dbStore).forEach(slug => {
-  seedQueueIfEmpty(slug, dbStore[slug]);
+// ── INITIALIZE TURSO DB & QUEUES ON STARTUP ─────────────────────────────────────
+initAndMigrateTurso().then(() => {
+  Object.keys(dbStore).forEach(slug => {
+    seedQueueIfEmpty(slug, dbStore[slug]);
+  });
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  scan-qr backend v12.0 (Turbo Persistent DB Engine) running on port ${PORT}`);
+  console.log(`✅  scan-qr backend v13.0 (Turso Cloud SQLite Active) running on port ${PORT}`);
 });
