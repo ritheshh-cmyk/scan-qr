@@ -395,28 +395,33 @@
     #printableStand { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; color: black; }
   }
 
+  /* ── Reusable grid classes (override-friendly) ── */
+  .qr-studio-layout { display: grid; grid-template-columns: 1fr 340px; gap: 28px; align-items: start; }
+  .grid-2col        { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3col        { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .grid-2col-logo   { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; }
+  .grid-3col-name   { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
   /* ===== MOBILE RESPONSIVE ===== */
   @media (max-width: 768px) {
 
     /* Topbar */
     .topbar {
-      padding: 0 14px;
+      padding: 10px 14px;
       height: auto;
       min-height: 56px;
       flex-wrap: wrap;
-      gap: 10px;
-      padding-top: 10px;
-      padding-bottom: 10px;
+      gap: 8px;
     }
     .auto-refresh-toggle { display: none; }
-    .backend-badge { font-size: 0.7rem; padding: 4px 10px; }
-    .brand { font-size: 1rem; }
-    .brand-icon { width: 28px; height: 28px; font-size: 0.95rem; }
+    .backend-badge { font-size: 0.68rem; padding: 4px 9px; }
+    .brand { font-size: 0.95rem; }
+    .brand-icon { width: 26px; height: 26px; font-size: 0.9rem; }
     .spacer { display: none; }
 
     /* Tabs nav */
     .tabs-nav {
-      padding: 6px 10px;
+      padding: 5px 8px;
       gap: 4px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
@@ -425,115 +430,67 @@
     }
     .tabs-nav::-webkit-scrollbar { display: none; }
     .tab-item {
-      padding: 9px 12px;
-      font-size: 0.78rem;
+      padding: 8px 11px;
+      font-size: 0.76rem;
       white-space: nowrap;
       flex-shrink: 0;
+      border-radius: 8px;
     }
 
     /* Content area */
-    .content-area { padding: 14px 12px; }
+    .content-area { padding: 12px 10px; }
 
     /* Cards */
-    .card { padding: 16px 14px; border-radius: 14px; }
-    .card-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .card { padding: 14px 12px; border-radius: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .card-header { flex-direction: column !important; align-items: flex-start !important; gap: 10px; }
     .card-header h3 { font-size: 1rem; }
 
     /* Stats grid */
-    .stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
-    .stat-card { padding: 16px 14px; border-radius: 12px; }
-    .stat-value { font-size: 1.6rem; }
+    .stats-grid { grid-template-columns: 1fr 1fr !important; gap: 10px; margin-bottom: 16px; }
+    .stat-card { padding: 14px 12px; border-radius: 12px; }
+    .stat-value { font-size: 1.5rem; }
 
     /* Biz grid */
-    .biz-grid { grid-template-columns: 1fr; gap: 14px; }
+    .biz-grid { grid-template-columns: 1fr !important; gap: 12px; }
     .biz-card-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .biz-actions .btn { font-size: 0.76rem; padding: 6px 10px; }
 
-    /* Add form grid — single column */
+    /* Form grids */
     .add-form-grid { grid-template-columns: 1fr !important; }
-    .add-form { padding: 16px 14px; }
+    .add-form { padding: 14px 12px; }
 
-    /* Tables — horizontal scroll */
-    .status-table-wrap, .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .status-table { min-width: 560px; }
-    .status-table th, .status-table td { padding: 10px 12px; font-size: 0.8rem; }
+    /* Tables */
+    .status-table { min-width: 520px; }
+    .status-table th, .status-table td { padding: 9px 10px; font-size: 0.79rem; }
 
     /* Modals */
-    .modal {
-      width: calc(100% - 16px);
-      max-height: 92vh;
-      padding: 20px 16px;
-      border-radius: 16px;
-    }
-    .modal h3 { font-size: 1.05rem; }
-    .modal-footer { flex-direction: column; gap: 10px; }
+    .modal { width: calc(100% - 14px); max-height: 92vh; padding: 18px 14px; border-radius: 16px; }
+    .modal h3 { font-size: 1rem; }
+    .modal-footer { flex-direction: column; gap: 8px; }
     .modal-footer .btn { width: 100%; justify-content: center; }
 
-    /* Modal grids — single column */
-    .modal .add-form-grid,
-    .modal [style*="grid-template-columns"] {
-      grid-template-columns: 1fr !important;
-    }
+    /* QR Studio — class-based grid overrides */
+    .qr-studio-layout { grid-template-columns: 1fr !important; }
+    .grid-2col        { grid-template-columns: 1fr !important; }
+    .grid-3col        { grid-template-columns: 1fr 1fr !important; }
+    .grid-2col-logo   { grid-template-columns: 1fr !important; }
+    .grid-3col-name   { grid-template-columns: 1fr 1fr !important; }
 
-    /* QR Studio — stack vertically */
-    #tab-content-qrstudio [style*="grid-template-columns:1fr 340px"],
-    #tab-content-qrstudio [style*="grid-template-columns: 1fr 340px"] {
-      display: flex !important;
-      flex-direction: column !important;
-      gap: 20px !important;
-    }
-    #qrPreviewWrap { display: flex !important; justify-content: center !important; }
-    #tab-content-qrstudio [style*="grid-template-columns:1fr 1fr 1fr"],
-    #tab-content-qrstudio [style*="grid-template-columns: 1fr 1fr 1fr"] {
-      grid-template-columns: 1fr 1fr !important;
-    }
-    #tab-content-qrstudio [style*="grid-template-columns:1fr 1fr"] {
-      grid-template-columns: 1fr !important;
-    }
+    /* Health tab */
+    #healthFifoGrid   { grid-template-columns: 1fr 1fr !important; }
 
-    /* Colors row in QR studio — 2 col */
-    #tab-content-qrstudio [style*="grid-template-columns:1fr 1fr 1fr"] {
-      grid-template-columns: 1fr 1fr !important;
-    }
-
-    /* Bank inspector grids */
-    #tab-content-bank [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
-    #bankSummaryGrid { grid-template-columns: 1fr !important; }
-
-    /* Businesses tab header */
-    #tab-content-businesses > div:first-child { flex-direction: column !important; gap: 12px !important; align-items: flex-start !important; }
-    #tab-content-businesses > div:first-child > div { flex-direction: column !important; width: 100%; }
-    #tab-content-businesses > div:first-child .btn { width: 100%; justify-content: center; }
-
-    /* Analytics card header */
-    #tab-content-analytics .card-header { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
-    #tab-content-analytics [style*="display:flex"] { flex-wrap: wrap !important; }
-
-    /* Bank tab top header */
-    #tab-content-bank > div:first-child { flex-direction: column !important; gap: 14px !important; }
-    #tab-content-bank > div:first-child > div:last-child { flex-direction: column !important; width: 100%; }
-    #tab-content-bank > div:first-child .btn { width: 100%; justify-content: center; }
-
-    /* Toast — bottom center on mobile */
-    #toast {
-      bottom: 16px;
-      right: 12px;
-      left: 12px;
-      text-align: center;
-    }
-
-    /* Buttons in biz actions */
-    .biz-actions { gap: 6px; }
-    .biz-actions .btn { font-size: 0.78rem; padding: 7px 12px; }
-
-    /* Status tab header */
-    #tab-content-status .card-header { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+    /* Toast — centered on mobile */
+    #toast { bottom: 14px; right: 10px; left: 10px; text-align: center; }
   }
 
   @media (max-width: 480px) {
-    .stats-grid { grid-template-columns: 1fr; }
-    .stat-value { font-size: 1.4rem; }
-    .btn-sm { font-size: 0.78rem; padding: 7px 12px; }
-    .tab-item { padding: 8px 10px; font-size: 0.72rem; }
+    .stats-grid  { grid-template-columns: 1fr !important; }
+    .stat-value  { font-size: 1.3rem; }
+    .btn-sm      { font-size: 0.76rem; padding: 6px 10px; }
+    .tab-item    { padding: 7px 9px; font-size: 0.7rem; }
+    .grid-3col   { grid-template-columns: 1fr !important; }
+    .grid-3col-name { grid-template-columns: 1fr !important; }
+    #healthFifoGrid { grid-template-columns: 1fr !important; }
   }
 </style>
 </head>
@@ -563,17 +520,18 @@
       ⏱️ Auto-Refresh (10s)
     </label>
     <div class="spacer"></div>
-    <div class="tabs-nav">
-    <div class="tab-item active" onclick="switchTab('status',this)" id="tab-status">📊 System Status</div>
-    <div class="tab-item" onclick="switchTab('health',this)" id="tab-health">🩺 Health Monitor</div>
-    <div class="tab-item" onclick="switchTab('bank',this)" id="tab-bank">📦 5K Review Bank &amp; CSV Audit</div>
-    <div class="tab-item" onclick="switchTab('qrstudio',this)" id="tab-qrstudio">🎨 QR Studio &amp; Instant Generator</div>
-    <div class="tab-item" onclick="switchTab('analytics',this)" id="tab-analytics">📈 Real-Time Analytics</div>
-    <div class="tab-item" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
-    <div class="tab-item" onclick="switchTab('settings',this)" id="tab-settings">⚙️ Settings &amp; Turso Cloud DB</div>
-  </div>
-    <span id="backendBadge" class="backend-badge"><span class="pulse-dot"></span> ☁️ Turso Cloud SQLite Active</span>
+    <span id="backendBadge" class="backend-badge"><span class="pulse-dot"></span> ☁️ Turso Cloud</span>
     <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+  </div>
+
+  <div class="tabs-nav">
+    <div class="tab-item active" onclick="switchTab('status',this)" id="tab-status">📊 Status</div>
+    <div class="tab-item" onclick="switchTab('health',this)" id="tab-health">🩺 Health</div>
+    <div class="tab-item" onclick="switchTab('bank',this)" id="tab-bank">📦 Review Bank</div>
+    <div class="tab-item" onclick="switchTab('qrstudio',this)" id="tab-qrstudio">🎨 QR Studio</div>
+    <div class="tab-item" onclick="switchTab('analytics',this)" id="tab-analytics">📈 Analytics</div>
+    <div class="tab-item" onclick="switchTab('businesses',this)" id="tab-businesses">🏪 Businesses</div>
+    <div class="tab-item" onclick="switchTab('settings',this)" id="tab-settings">⚙️ Settings</div>
   </div>
 
   <div class="content-area">
@@ -718,7 +676,7 @@
           </label>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 340px;gap:28px;align-items:start">
+        <div class="qr-studio-layout">
 
           <!-- LEFT: Controls -->
           <div style="display:grid;gap:18px">
@@ -734,7 +692,7 @@
             </div>
 
             <!-- Colors -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div class="grid-3col">
               <div>
                 <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">🎨 QR Dark Color</label>
                 <input id="qrDarkColor" type="color" value="#6366f1" onchange="renderQrStudio()" style="height:44px;padding:3px;cursor:pointer;width:100%">
@@ -756,7 +714,7 @@
             </div>
 
             <!-- Error Correction & Corner Style -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="grid-2col">
               <div>
                 <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">🛡️ Error Correction</label>
                 <select id="qrCorrectLevel" onchange="renderQrStudio()">
@@ -777,7 +735,7 @@
             </div>
 
             <!-- Label & Frame -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="grid-2col">
               <div>
                 <label style="font-size:0.82rem;color:var(--muted);display:block;margin-bottom:5px">🏷️ Label Text (below QR)</label>
                 <input id="qrLabel" type="text" placeholder="e.g. Scan to Rate Us! ⭐" oninput="renderQrStudio()">
@@ -793,7 +751,7 @@
             <!-- Logo Upload -->
             <div style="background:var(--bg);border:1px dashed var(--border);border-radius:12px;padding:14px">
               <div style="font-size:0.82rem;font-weight:700;margin-bottom:10px">🖼️ Center Logo / Brand Image</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center">
+              <div class="grid-2col-logo">
                 <div>
                   <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:5px">Upload Logo (PNG/JPG/SVG)</label>
                   <input id="qrLogoUpload" type="file" accept="image/*" onchange="handleLogoUpload(event)" style="font-size:0.82rem;width:100%">
@@ -813,7 +771,7 @@
             <!-- Business Name on QR -->
             <div style="background:var(--bg);border:1px dashed var(--border);border-radius:12px;padding:14px">
               <div style="font-size:0.82rem;font-weight:700;margin-bottom:10px">🏪 Business Name on QR</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+              <div class="grid-3col-name">
                 <div>
                   <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:5px">Name Text</label>
                   <input id="qrBizName" type="text" placeholder="e.g. Prison Mandi" oninput="renderQrStudio()">
