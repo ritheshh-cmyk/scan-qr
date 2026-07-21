@@ -4,20 +4,35 @@
     "type": "saloon",
     "googleReviewLink": "https://search.google.com/local/writereview?placeid=YOUR_SALOON_PLACE_ID",
     "siteUrl": "https://scanqr-beta.vercel.app?biz=saloon",
-    "language": "English"
+    "language": "English",
+    "menuItems": "haircut, beard trim, hair spa, scalp massage",
+    "highlights": "spotless clean salon, warm tea served, friendly barbers, fair prices"
   },
   "youngwear_fashions": {
     "name": "Youngwear Fashions",
     "type": "clothing store",
     "googleReviewLink": "https://search.google.com/local/writereview?placeid=YOUR_YOUNGWEAR_PLACE_ID",
     "siteUrl": "https://scanqr-beta.vercel.app?biz=youngwear_fashions",
-    "language": "English"
+    "language": "English",
+    "menuItems": "denim jackets, cotton sarees, crop tops, casual wear, sneakers",
+    "highlights": "trendy styles, comfortable fabric, helpful staff, spotless boutique"
   },
   "demo": {
     "name": "Demo Beauty Salon",
     "type": "salon",
     "googleReviewLink": "https://search.google.com/local/writereview?placeid=YOUR_DEMO_PLACE_ID",
     "siteUrl": "https://scanqr-beta.vercel.app?biz=demo",
-    "language": "English"
+    "language": "English",
+    "menuItems": "facial, manicure, pedicure, hair styling",
+    "highlights": "cozy atmosphere, gentle staff, great music, quick service"
+  },
+  "prision_mandi": {
+    "name": "Prison Mandi",
+    "type": "mandi restaurant",
+    "googleReviewLink": "https://search.google.com/local/writereview?placeid=YOUR_PRISON_MANDI_PLACE_ID",
+    "siteUrl": "https://scanqr-beta.vercel.app?biz=prision_mandi",
+    "language": "English",
+    "menuItems": "fried mandi, juicy mandi, alfaham mandi, grill mandi",
+    "highlights": "authentic mandi flavor, cozy theme dining, generous portions, quick service"
   }
 }
